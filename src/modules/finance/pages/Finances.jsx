@@ -154,10 +154,16 @@ function Finances() {
     const layout = {
       title: 'Cash Flow Analysis',
       autosize: true,
-      margin: { l: 50, r: 50, b: 50, t: 50, pad: 4 },
-      xaxis: { title: 'Period' },
+      margin: { l: 50, r: 50, b: 80, t: 50, pad: 4 }, // Aumentar el margen inferior
+      xaxis: { 
+        title: {
+          text: 'Period',
+          font: { size: 14 },
+          standoff: 25 // Aumentar la distancia entre el eje y el título
+        }
+      },
       yaxis: { title: 'Amount' },
-      legend: { orientation: 'h', y: -0.2 }
+      legend: { orientation: 'h', y: -0.3 } // Ajustar la posición de la leyenda
     };
     
     Plotly.newPlot(cashFlowChartRef.current, traces, layout, { responsive: true });
@@ -299,91 +305,345 @@ function Finances() {
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
       
-      // Añadir título y fecha
-      pdf.setFontSize(18);
-      pdf.setTextColor(44, 62, 80);
-      pdf.text('Informe Financiero', pageWidth / 2, 15, { align: 'center' });
+      // Añadir título y fecha con estilo mejorado
+      pdf.setFillColor(248, 250, 252); // bg-gray-50
+      pdf.rect(0, 0, pageWidth, 30, 'F');
+      
+      pdf.setFontSize(22);
+      pdf.setTextColor(31, 41, 55); // text-gray-800
+      pdf.setFont(undefined, 'bold');
+      pdf.text('Financial Report', pageWidth / 2, 15, { align: 'center' });
       
       pdf.setFontSize(10);
-      pdf.setTextColor(100, 100, 100);
-      const today = new Date().toLocaleDateString();
-      pdf.text(`Generado el: ${today}`, pageWidth / 2, 22, { align: 'center' });
+      pdf.setTextColor(107, 114, 128); // text-gray-500
+      pdf.setFont(undefined, 'normal');
+      const today = new Date().toLocaleDateString('en-US');
+      pdf.text(`Generated on: ${today}`, pageWidth / 2, 22, { align: 'center' });
       
-      // Añadir resumen financiero
-      pdf.setFontSize(14);
-      pdf.setTextColor(44, 62, 80);
-      pdf.text('Resumen Financiero', 14, 30);
+      // Añadir línea separadora
+      pdf.setDrawColor(229, 231, 235); // border-gray-200
+      pdf.line(14, 30, pageWidth - 14, 30);
       
-      pdf.setFontSize(10);
-      pdf.setTextColor(0, 0, 0);
-      pdf.text(`Ventas Totales: $${formatNumber(financialSummary.total_sales)}`, 14, 38);
-      pdf.text(`Gastos Totales: $${formatNumber(financialSummary.total_expenses)}`, 14, 44);
-      pdf.text(`Beneficio Neto: $${formatNumber(financialSummary.net_profit)}`, 14, 50);
-      pdf.text(`Margen de Beneficio: ${formatNumber(financialSummary.profit_margin)}%`, 14, 56);
+      // Add financial summary with web-style cards
+      pdf.setFontSize(16);
+      pdf.setTextColor(31, 41, 55); // text-gray-800
+      pdf.setFont(undefined, 'bold');
+      pdf.text('Financial Summary', 14, 40);
       
-      // Capturar las gráficas como imágenes
-      const captureAndAddChart = async (ref, title, yPosition) => {
-        if (!ref.current) return yPosition;
+      // Función para crear tarjetas estilo web
+      const createCard = (title, value, color, icon, description, x, y, width, height) => {
+        // Fondo de la tarjeta
+        pdf.setFillColor(255, 255, 255); // bg-white
+        pdf.setDrawColor(229, 231, 235); // border-gray-200
+        pdf.roundedRect(x, y, width, height, 2, 2, 'FD');
         
-        try {
-          const canvas = await html2canvas(ref.current, {
-            scale: 2,
-            logging: false,
-            useCORS: true
-          });
+        // Título
+        pdf.setFontSize(10);
+        pdf.setTextColor(75, 85, 99); // text-gray-600
+        pdf.setFont(undefined, 'normal');
+        pdf.text(title, x + 5, y + 7);
+        
+        // Valor
+        pdf.setFontSize(14);
+        pdf.setTextColor(...color);
+        pdf.setFont(undefined, 'bold');
+        pdf.text(value, x + 5, y + 15);
+        
+        // Línea separadora
+        pdf.setDrawColor(243, 244, 246); // border-gray-100
+        pdf.line(x + 5, y + 20, x + width - 5, y + 20);
+        
+        // Descripción
+        if (description) {
+          pdf.setFontSize(8);
+          pdf.setTextColor(107, 114, 128); // text-gray-500
+          pdf.setFont(undefined, 'normal');
           
-          const imgData = canvas.toDataURL('image/png');
-          const imgWidth = pageWidth - 28; // Margen de 14mm en cada lado
-          const imgHeight = (canvas.height * imgWidth) / canvas.width;
-          
-          // Verificar si necesitamos una nueva página
-          if (yPosition + imgHeight + 20 > pageHeight) {
-            pdf.addPage();
-            yPosition = 20;
-          }
-          
-          pdf.setFontSize(12);
-          pdf.setTextColor(44, 62, 80);
-          pdf.text(title, 14, yPosition);
-          
-          pdf.addImage(imgData, 'PNG', 14, yPosition + 5, imgWidth, imgHeight);
-          
-          return yPosition + imgHeight + 20; // Devolver la nueva posición Y
-        } catch (err) {
-          console.error(`Error capturing chart ${title}:`, err);
-          return yPosition + 10;
+          // Dividir descripción en múltiples líneas si es necesario
+          const splitDesc = pdf.splitTextToSize(description, width - 10);
+          pdf.text(splitDesc, x + 5, y + 24);
         }
       };
       
-      // Añadir KPIs adicionales
-      pdf.addPage();
-      pdf.setFontSize(14);
-      pdf.setTextColor(44, 62, 80);
-      pdf.text('Indicadores Clave de Rendimiento (KPIs)', 14, 20);
+      // Crear tarjetas para los KPIs principales
+      const cardWidth = (pageWidth - 28 - 10) / 3; // 3 tarjetas por fila con 5mm de separación
+      const cardHeight = 40;
       
-      const additionalKPIs = calculateAdditionalKPIs();
+      // First row of cards
+      createCard(
+        'Total Sales',
+        `$${formatNumber(financialSummary.total_sales)}`,
+        [22, 163, 74], // text-green-600
+        'dollar',
+        'Total revenue generated from all sales activities.',
+        14, 45, cardWidth, cardHeight
+      );
+      
+      createCard(
+        'Total Expenses',
+        `$${formatNumber(financialSummary.total_expenses)}`,
+        [220, 38, 38], // text-red-600
+        'expense',
+        'Sum of all operational costs and business expenses.',
+        14 + cardWidth + 5, 45, cardWidth, cardHeight
+      );
+      
+      createCard(
+        'Net Profit',
+        `$${formatNumber(financialSummary.net_profit)}`,
+        financialSummary.net_profit > 0 ? [22, 163, 74] : [220, 38, 38],
+        'profit',
+        'Calculated as Total Sales minus Total Expenses.',
+        14 + (cardWidth + 5) * 2, 45, cardWidth, cardHeight
+      );
+      
+      // Second row of cards
+      createCard(
+        'Profit Margin',
+        `${formatNumber(financialSummary.profit_margin)}%`,
+        [147, 51, 234], // text-purple-600
+        'percentage',
+        'Calculated as (Net Profit / Total Sales) × 100. Indicates what percentage of sales is converted to actual profit.',
+        14, 45 + cardHeight + 5, cardWidth, cardHeight
+      );
+      
+      createCard(
+        'Accounts Receivable',
+        `$${formatNumber(financialSummary.accounts_receivable)}`,
+        financialSummary.accounts_receivable > 0 ? [22, 163, 74] : [220, 38, 38],
+        'money',
+        'Money owed to your company by customers for goods or services delivered but not yet paid for.',
+        14 + cardWidth + 5, 45 + cardHeight + 5, cardWidth, cardHeight
+      );
+      
+      createCard(
+        'Accounts Payable',
+        `$${formatNumber(financialSummary.accounts_payable)}`,
+        financialSummary.accounts_payable > 0 ? [22, 163, 74] : [220, 38, 38],
+        'bill',
+        'Money your company owes to suppliers for goods or services received but not yet paid for.',
+        14 + (cardWidth + 5) * 2, 45 + cardHeight + 5, cardWidth, cardHeight
+      );
+      
+      // Usar los KPIs adicionales ya calculados previamente
+      
+      // Third row of cards (Additional KPIs)
       if (additionalKPIs) {
-        pdf.setFontSize(10);
-        pdf.setTextColor(0, 0, 0);
-        pdf.text(`ROI: ${formatNumber(additionalKPIs.roi)}%`, 14, 30);
-        pdf.text(`Ratio de Liquidez: ${formatNumber(additionalKPIs.currentRatio)}`, 14, 36);
-        pdf.text(`Eficiencia Operativa: ${formatNumber(additionalKPIs.operationalEfficiency)}%`, 14, 42);
-        pdf.text(`Volatilidad del Flujo de Caja: ${formatNumber(additionalKPIs.cashFlowVolatility)}%`, 14, 48);
-        pdf.text(`Tasa de Crecimiento: ${formatNumber(additionalKPIs.growthRate)}%`, 14, 54);
+        // Title for the additional KPIs section
+        pdf.setFontSize(16);
+        pdf.setTextColor(31, 41, 55); // text-gray-800
+        pdf.setFont(undefined, 'bold');
+        pdf.text('Key Performance Indicators (KPIs)', 14, 45 + (cardHeight + 5) * 2 + 5);
+        
+        createCard(
+          'ROI',
+          `${formatNumber(additionalKPIs.roi)}%`,
+          [79, 70, 229], // text-indigo-600
+          'chart',
+          'Return on Investment. Measures how efficiently investments generate profit.',
+          14, 45 + (cardHeight + 5) * 2 + 10, cardWidth, cardHeight
+        );
+        
+        createCard(
+          'Current Ratio',
+          formatNumber(additionalKPIs.currentRatio),
+          [13, 148, 136], // text-teal-600
+          'calculator',
+          'Calculated as Accounts Receivable / Accounts Payable. Indicates ability to pay short-term obligations.',
+          14 + cardWidth + 5, 45 + (cardHeight + 5) * 2 + 10, cardWidth, cardHeight
+        );
+        
+        createCard(
+          'Operational Efficiency',
+          `${formatNumber(additionalKPIs.operationalEfficiency)}%`,
+          [217, 119, 6], // text-amber-600
+          'gauge',
+          'Measure of how effectively resources are used to generate operating income.',
+          14 + (cardWidth + 5) * 2, 45 + (cardHeight + 5) * 2 + 10, cardWidth, cardHeight
+        );
       }
       
-      // Capturar y añadir las gráficas
-      let yPos = 65;
-      yPos = await captureAndAddChart(cashFlowChartRef, 'Análisis de Flujo de Caja', yPos);
-      yPos = await captureAndAddChart(accumulatedCashFlowChartRef, 'Flujo de Caja Acumulado', yPos);
+      // Configuración para capturar gráficos con tamaño fijo ya definida arriba
       
+      // Los KPIs adicionales ya se muestran en las tarjetas de la tercera fila
+      
+      // ===== SECOND PAGE: GRAPHICAL ANALYSIS (2 charts) =====
       pdf.addPage();
-      yPos = 20;
-      yPos = await captureAndAddChart(cashFlowCompositionRef, 'Composición del Flujo de Caja', yPos);
-      yPos = await captureAndAddChart(profitabilityChartRef, 'Análisis de Rentabilidad', yPos);
       
-      // Guardar el PDF
-      pdf.save('informe_financiero.pdf');
+      // Second page header
+      pdf.setFillColor(248, 250, 252); // bg-gray-50
+      pdf.rect(0, 0, pageWidth, 30, 'F');
+      
+      pdf.setFontSize(18);
+      pdf.setTextColor(31, 41, 55); // text-gray-800
+      pdf.setFont(undefined, 'bold');
+      pdf.text('Graphical Analysis', pageWidth / 2, 15, { align: 'center' });
+      
+      pdf.setFontSize(10);
+      pdf.setTextColor(107, 114, 128); // text-gray-500
+      pdf.setFont(undefined, 'normal');
+      pdf.text(`Generated on: ${today}`, pageWidth / 2, 22, { align: 'center' });
+      
+      // Añadir línea separadora
+      pdf.setDrawColor(229, 231, 235); // border-gray-200
+      pdf.line(14, 30, pageWidth - 14, 30);
+      
+      // Definir márgenes consistentes para todas las páginas
+      const pageMargin = 15; // 15mm de margen en cada lado (estándar para página carta)
+      
+      // Calcular el ancho disponible para las gráficas en una página carta
+      const availableWidth = pageWidth - (pageMargin * 2);
+      
+      // Usar una proporción más conservadora para evitar que se salgan de la página
+      const aspectRatio = 2; // Proporción más ancha que alta para que quepan mejor
+      
+      // Configuración para capturar gráficos con tamaño ajustado a página carta
+      const captureOptions = {
+        scale: 1.5, // Escala para buena calidad
+        logging: false,
+        useCORS: true,
+        width: 800, // Ancho suficiente para capturar todos los elementos
+        height: 400, // Alto suficiente para capturar todos los elementos
+        windowWidth: 1200, // Ancho de ventana para asegurar que se capturen todos los elementos
+        windowHeight: 800, // Alto de ventana para asegurar que se capturen todos los elementos
+        x: -50, // Ajuste horizontal para capturar elementos que podrían estar fuera del área visible
+        y: -50, // Ajuste vertical para capturar elementos que podrían estar fuera del área visible
+        scrollX: 0, // Asegurar que no haya desplazamiento horizontal
+        scrollY: 0 // Asegurar que no haya desplazamiento vertical
+      };
+      
+      // Capturar y añadir las primeras 2 gráficas en la segunda página
+      let yPos = 40;
+      
+      // Gráfica 1: Análisis de Flujo de Caja
+      if (cashFlowChartRef.current) {
+        try {
+          const canvas = await html2canvas(cashFlowChartRef.current, captureOptions);
+          const imgData = canvas.toDataURL('image/png');
+          const imgWidth = pageWidth - (pageMargin * 2); // Ancho de la imagen con márgenes iguales
+          const imgHeight = (canvas.height * imgWidth) / canvas.width;
+          
+          // Align title to the left
+          pdf.setFontSize(14);
+          pdf.setTextColor(31, 41, 55); // text-gray-800
+          pdf.setFont(undefined, 'bold');
+          pdf.text('Cash Flow Analysis', pageMargin, yPos);
+          
+          // Centrar la imagen en la página
+          pdf.addImage(imgData, 'PNG', pageMargin, yPos + 5, imgWidth, imgHeight);
+          yPos += imgHeight + 25; // Aumentar el espacio entre gráficas
+        } catch (err) {
+          console.error('Error capturing Cash Flow Chart:', err);
+        }
+      }
+      
+      // Gráfica 2: Flujo de Caja Acumulado
+      if (accumulatedCashFlowChartRef.current) {
+        try {
+          const canvas = await html2canvas(accumulatedCashFlowChartRef.current, captureOptions);
+          const imgData = canvas.toDataURL('image/png');
+          const imgWidth = pageWidth - (pageMargin * 2); // Ancho de la imagen con márgenes iguales
+          const imgHeight = (canvas.height * imgWidth) / canvas.width;
+          
+          // Align title to the left
+          pdf.setFontSize(14);
+          pdf.setTextColor(31, 41, 55); // text-gray-800
+          pdf.setFont(undefined, 'bold');
+          pdf.text('Accumulated Cash Flow', pageMargin, yPos);
+          
+          // Centrar la imagen en la página
+          pdf.addImage(imgData, 'PNG', pageMargin, yPos + 5, imgWidth, imgHeight);
+        } catch (err) {
+          console.error('Error capturing Accumulated Cash Flow Chart:', err);
+        }
+      }
+      
+      // ===== THIRD PAGE: GRAPHICAL ANALYSIS CONTINUATION (2 remaining charts) =====
+      pdf.addPage();
+      
+      // Third page header
+      pdf.setFillColor(248, 250, 252); // bg-gray-50
+      pdf.rect(0, 0, pageWidth, 30, 'F');
+      
+      pdf.setFontSize(18);
+      pdf.setTextColor(31, 41, 55); // text-gray-800
+      pdf.setFont(undefined, 'bold');
+      pdf.text('Graphical Analysis - Continuation', pageWidth / 2, 15, { align: 'center' });
+      
+      pdf.setFontSize(10);
+      pdf.setTextColor(107, 114, 128); // text-gray-500
+      pdf.setFont(undefined, 'normal');
+      pdf.text(`Generated on: ${today}`, pageWidth / 2, 22, { align: 'center' });
+      
+      // Añadir línea separadora
+      pdf.setDrawColor(229, 231, 235); // border-gray-200
+      pdf.line(14, 30, pageWidth - 14, 30);
+      
+      // Capturar y añadir las 2 gráficas restantes en la tercera página
+      yPos = 40;
+      
+      // Gráfica 3: Composición del Flujo de Caja
+      if (cashFlowCompositionRef.current) {
+        try {
+          const canvas = await html2canvas(cashFlowCompositionRef.current, captureOptions);
+          const imgData = canvas.toDataURL('image/png');
+          const imgWidth = pageWidth - (pageMargin * 2); // Ancho de la imagen con márgenes iguales
+          const imgHeight = (canvas.height * imgWidth) / canvas.width;
+          
+          // Align title to the left
+          pdf.setFontSize(14);
+          pdf.setTextColor(31, 41, 55); // text-gray-800
+          pdf.setFont(undefined, 'bold');
+          pdf.text('Cash Flow Composition', pageMargin, yPos);
+          
+          // Centrar la imagen en la página
+          pdf.addImage(imgData, 'PNG', pageMargin, yPos + 5, imgWidth, imgHeight);
+          yPos += imgHeight + 25; // Aumentar el espacio entre gráficas
+        } catch (err) {
+          console.error('Error capturing Cash Flow Composition Chart:', err);
+        }
+      }
+      
+      // Gráfica 4: Análisis de Rentabilidad
+      if (profitabilityChartRef.current) {
+        try {
+          const canvas = await html2canvas(profitabilityChartRef.current, captureOptions);
+          const imgData = canvas.toDataURL('image/png');
+          const imgWidth = pageWidth - (pageMargin * 2); // Ancho de la imagen con márgenes iguales
+          const imgHeight = (canvas.height * imgWidth) / canvas.width;
+          
+          // Align title to the left
+          pdf.setFontSize(14);
+          pdf.setTextColor(31, 41, 55); // text-gray-800
+          pdf.setFont(undefined, 'bold');
+          pdf.text('Profitability Analysis', pageMargin, yPos);
+          
+          // Centrar la imagen en la página
+          pdf.addImage(imgData, 'PNG', pageMargin, yPos + 5, imgWidth, imgHeight);
+        } catch (err) {
+          console.error('Error capturing Profitability Chart:', err);
+        }
+      }
+      
+      // Generar un nombre de archivo con fecha y hora para evitar duplicaciones (GMT-5)
+      const now = new Date();
+      const options = { 
+        year: 'numeric', 
+        month: '2-digit', 
+        day: '2-digit',
+        hour: '2-digit', 
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+        timeZone: 'America/New_York' // GMT-5 (Eastern Time)
+      };
+      const formattedDate = new Intl.DateTimeFormat('en-US', options)
+        .format(now)
+        .replace(/[\/:]/g, '-');
+      const filename = `Financial_Report_${formattedDate}.pdf`;
+
+      // Guardar el PDF con el nombre generado
+      pdf.save(filename);
       
       setExporting(false);
     } catch (err) {
