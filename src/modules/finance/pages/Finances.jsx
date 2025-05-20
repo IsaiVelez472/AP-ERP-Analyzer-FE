@@ -1,26 +1,23 @@
-import React, { useState, useEffect } from 'react';
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, ArcElement } from 'chart.js';
-import { Line, Bar, Doughnut } from 'react-chartjs-2';
+import React, { useState, useEffect, useRef } from 'react';
 import { reinitPreline } from '../../../utils/preline';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
-// Registrar los componentes de Chart.js
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend
-);
+// Importar Plotly desde window global
+const Plotly = window.Plotly;
 
 function Finances() {
   const [financialSummary, setFinancialSummary] = useState(null);
   const [cashFlow, setCashFlow] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [exporting, setExporting] = useState(false);
+  
+  // Referencia al contenedor principal para exportar PDF
+  const reportContainerRef = useRef(null);
+
+  // Definir la URL de la API con una URL de respaldo en caso de que la variable de entorno no esté disponible
+  const API_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5002';
 
   useEffect(() => {
     // Reinicializar componentes de Preline cuando el componente se monta
@@ -30,18 +27,19 @@ function Finances() {
     const fetchFinancialData = async () => {
       try {
         setLoading(true);
+        console.log('Fetching data from API URL:', API_URL);
         
         // Obtener resumen financiero
-        const summaryResponse = await fetch('http://127.0.0.1:5002/api/kpis/financial/summary');
+        const summaryResponse = await fetch(`${API_URL}/api/kpis/financial/summary`);
         if (!summaryResponse.ok) {
-          throw new Error('Failed to fetch financial summary');
+          throw new Error(`Error ${summaryResponse.status}: No se pudo obtener el resumen financiero`);
         }
         const summaryData = await summaryResponse.json();
         
         // Obtener datos de flujo de caja
-        const cashFlowResponse = await fetch('http://127.0.0.1:5002/api/kpis/financial/cash-flow');
+        const cashFlowResponse = await fetch(`${API_URL}/api/kpis/financial/cash-flow`);
         if (!cashFlowResponse.ok) {
-          throw new Error('Failed to fetch cash flow data');
+          throw new Error(`Error ${cashFlowResponse.status}: No se pudo obtener los datos de flujo de caja`);
         }
         const cashFlowData = await cashFlowResponse.json();
         
@@ -49,71 +47,28 @@ function Finances() {
         setCashFlow(cashFlowData);
         setLoading(false);
       } catch (err) {
-        setError(err.message);
-        setLoading(false);
-        
-        // Para desarrollo, cargar datos de ejemplo si la API falla
-        console.error('Error fetching data:', err);
-        loadMockData();
+        handleApiError(err);
       }
     };
     
     fetchFinancialData();
   }, []);
   
-  // Función para cargar datos de ejemplo si la API falla
-  const loadMockData = () => {
-    setFinancialSummary({
-      "periods": ["2024-02", "2024-03", "2024-04", "2024-05", "2024-06"],
-      "total_sales": 2513313541.16,
-      "total_expenses": -2841960946116.7417,
-      "net_profit": 2844474259657.902,
-      "profit_margin": 113176.25966973692,
-      "accounts_receivable": -14630534.937858462,
-      "accounts_payable": 1012669254.2006252,
-      "days_sales_outstanding": 0.0,
-      "days_payables_outstanding": 0.0,
-      "cash_flow_summary": {
-        "operating": -1155857392804.5535,
-        "investment": 0,
-        "financing": 178247288739.31,
-        "total": -977610104065.2435
-      }
-    });
-    
-    setCashFlow({
-      "periods": ["2024-02", "2024-03", "2024-04", "2024-05", "2024-06"],
-      "operating_cash_flow": {
-        "2024-02": 18454339.836924,
-        "2024-03": -2132147698.779016,
-        "2024-04": -1152208119564.8735,
-        "2024-05": -1448791866.276364,
-        "2024-06": -86788014.46147203
-      },
-      "investment_cash_flow": {},
-      "financing_cash_flow": {
-        "2024-02": 9668482.68,
-        "2024-03": 191248872.3,
-        "2024-04": 178926328001.22,
-        "2024-05": -928419366.8900003,
-        "2024-06": 48462750.0
-      },
-      "accumulated_cash_flow": {
-        "2024-02": 28122822.516924,
-        "2024-03": -1912776003.9620922,
-        "2024-04": -975194567567.6156,
-        "2024-05": -977571778800.782,
-        "2024-06": -977610104065.2434
-      },
-      "total_cash_flow": {
-        "2024-02": 28122822.516924,
-        "2024-03": -1940898826.479016,
-        "2024-04": -973281791563.6536,
-        "2024-05": -2377211233.1663647,
-        "2024-06": -38325264.461472034
-      }
-    });
-    
+  // Efecto para crear los gráficos cuando los datos estén disponibles
+  useEffect(() => {
+    if (financialSummary && cashFlow && !loading) {
+      // Crear los gráficos con Plotly
+      createCashFlowChart();
+      createAccumulatedCashFlowChart();
+      createCashFlowCompositionChart();
+      createProfitabilityChart();
+    }
+  }, [financialSummary, cashFlow, loading]);
+  
+  // Manejar errores de API sin usar mocks quemados
+  const handleApiError = (error) => {
+    console.error('Error fetching data:', error);
+    setError(`Error al cargar datos: ${error.message}. Por favor, verifica que el servidor esté en ejecución en ${API_URL}.`);
     setLoading(false);
   };
   
@@ -157,56 +112,89 @@ function Finances() {
     return '';
   };
   
-  // Preparar datos para el gráfico de flujo de caja
-  const prepareCashFlowChartData = () => {
-    if (!cashFlow) return null;
+  // Referencias para los gráficos de Plotly
+  const cashFlowChartRef = useRef(null);
+  const accumulatedCashFlowChartRef = useRef(null);
+  const cashFlowCompositionRef = useRef(null);
+  const profitabilityChartRef = useRef(null);
+  
+  // Función para crear el gráfico de flujo de caja con Plotly
+  const createCashFlowChart = () => {
+    if (!cashFlow || !cashFlowChartRef.current) return;
     
-    return {
-      labels: cashFlow.periods,
-      datasets: [
-        {
-          label: 'Operating Cash Flow',
-          data: cashFlow.periods.map(period => cashFlow.operating_cash_flow[period]),
-          borderColor: 'rgb(53, 162, 235)',
-          backgroundColor: 'rgba(53, 162, 235, 0.5)',
-        },
-        {
-          label: 'Financing Cash Flow',
-          data: cashFlow.periods.map(period => cashFlow.financing_cash_flow[period] || 0),
-          borderColor: 'rgb(75, 192, 192)',
-          backgroundColor: 'rgba(75, 192, 192, 0.5)',
-        },
-        {
-          label: 'Total Cash Flow',
-          data: cashFlow.periods.map(period => cashFlow.total_cash_flow[period]),
-          borderColor: 'rgb(255, 99, 132)',
-          backgroundColor: 'rgba(255, 99, 132, 0.5)',
-        }
-      ]
+    const periods = cashFlow.periods;
+    
+    const traces = [
+      {
+        x: periods,
+        y: periods.map(period => cashFlow.operating_cash_flow[period]),
+        type: 'scatter',
+        mode: 'lines+markers',
+        name: 'Operating Cash Flow',
+        line: { color: 'rgb(53, 162, 235)', width: 2 }
+      },
+      {
+        x: periods,
+        y: periods.map(period => cashFlow.financing_cash_flow[period] || 0),
+        type: 'scatter',
+        mode: 'lines+markers',
+        name: 'Financing Cash Flow',
+        line: { color: 'rgb(75, 192, 192)', width: 2 }
+      },
+      {
+        x: periods,
+        y: periods.map(period => cashFlow.total_cash_flow[period]),
+        type: 'scatter',
+        mode: 'lines+markers',
+        name: 'Total Cash Flow',
+        line: { color: 'rgb(255, 99, 132)', width: 2 }
+      }
+    ];
+    
+    const layout = {
+      title: 'Cash Flow Analysis',
+      autosize: true,
+      margin: { l: 50, r: 50, b: 50, t: 50, pad: 4 },
+      xaxis: { title: 'Period' },
+      yaxis: { title: 'Amount' },
+      legend: { orientation: 'h', y: -0.2 }
     };
+    
+    Plotly.newPlot(cashFlowChartRef.current, traces, layout, { responsive: true });
   };
   
-  // Preparar datos para el gráfico de flujo de caja acumulado
-  const prepareAccumulatedCashFlowChartData = () => {
-    if (!cashFlow) return null;
+  // Función para crear el gráfico de flujo de caja acumulado con Plotly
+  const createAccumulatedCashFlowChart = () => {
+    if (!cashFlow || !accumulatedCashFlowChartRef.current) return;
     
-    return {
-      labels: cashFlow.periods,
-      datasets: [
-        {
-          label: 'Accumulated Cash Flow',
-          data: cashFlow.periods.map(period => cashFlow.accumulated_cash_flow[period]),
-          borderColor: 'rgb(153, 102, 255)',
-          backgroundColor: 'rgba(153, 102, 255, 0.5)',
-          fill: true,
-        }
-      ]
+    const periods = cashFlow.periods;
+    
+    const traces = [
+      {
+        x: periods,
+        y: periods.map(period => cashFlow.accumulated_cash_flow[period]),
+        type: 'scatter',
+        mode: 'lines+markers',
+        name: 'Accumulated Cash Flow',
+        fill: 'tozeroy',
+        line: { color: 'rgb(153, 102, 255)', width: 2 }
+      }
+    ];
+    
+    const layout = {
+      title: 'Accumulated Cash Flow',
+      autosize: true,
+      margin: { l: 50, r: 50, b: 50, t: 50, pad: 4 },
+      xaxis: { title: 'Period' },
+      yaxis: { title: 'Amount' }
     };
+    
+    Plotly.newPlot(accumulatedCashFlowChartRef.current, traces, layout, { responsive: true });
   };
   
-  // Preparar datos para el gráfico de composición del flujo de caja
-  const prepareCashFlowCompositionData = () => {
-    if (!financialSummary) return null;
+  // Función para crear el gráfico de composición del flujo de caja con Plotly
+  const createCashFlowCompositionChart = () => {
+    if (!financialSummary || !cashFlowCompositionRef.current) return;
     
     const { cash_flow_summary } = financialSummary;
     
@@ -215,44 +203,57 @@ function Finances() {
     const investmentAbs = Math.abs(cash_flow_summary.investment);
     const financingAbs = Math.abs(cash_flow_summary.financing);
     
-    return {
+    const data = [{
+      values: [operatingAbs, investmentAbs, financingAbs],
       labels: ['Operating', 'Investment', 'Financing'],
-      datasets: [
-        {
-          data: [operatingAbs, investmentAbs, financingAbs],
-          backgroundColor: [
-            'rgba(255, 99, 132, 0.7)',
-            'rgba(54, 162, 235, 0.7)',
-            'rgba(255, 206, 86, 0.7)',
-          ],
-          borderColor: [
-            'rgba(255, 99, 132, 1)',
-            'rgba(54, 162, 235, 1)',
-            'rgba(255, 206, 86, 1)',
-          ],
-          borderWidth: 1,
-        },
-      ],
+      type: 'pie',
+      hole: 0.4,
+      marker: {
+        colors: [
+          'rgba(255, 99, 132, 0.7)',
+          'rgba(54, 162, 235, 0.7)',
+          'rgba(255, 206, 86, 0.7)'
+        ]
+      }
+    }];
+    
+    const layout = {
+      title: 'Cash Flow Composition',
+      autosize: true,
+      margin: { l: 0, r: 0, b: 0, t: 50, pad: 4 },
+      showlegend: true,
+      legend: { orientation: 'h', y: -0.2 }
     };
+    
+    Plotly.newPlot(cashFlowCompositionRef.current, data, layout, { responsive: true });
   };
   
-  // Preparar datos para el gráfico de rentabilidad
-  const prepareProfitabilityChartData = () => {
-    if (!financialSummary) return null;
+  // Función para crear el gráfico de rentabilidad con Plotly
+  const createProfitabilityChart = () => {
+    if (!financialSummary || !profitabilityChartRef.current) return;
     
     // Calcular la rentabilidad mensual (simulada basada en los datos disponibles)
     const monthlyProfitMargin = Array(5).fill(financialSummary.profit_margin / 5);
     
-    return {
-      labels: financialSummary.periods,
-      datasets: [
-        {
-          label: 'Profit Margin (%)',
-          data: monthlyProfitMargin,
-          backgroundColor: 'rgba(75, 192, 192, 0.7)',
-        }
-      ]
+    const data = [{
+      x: financialSummary.periods,
+      y: monthlyProfitMargin,
+      type: 'bar',
+      name: 'Profit Margin (%)',
+      marker: {
+        color: 'rgba(75, 192, 192, 0.7)'
+      }
+    }];
+    
+    const layout = {
+      title: 'Profitability Analysis',
+      autosize: true,
+      margin: { l: 50, r: 50, b: 50, t: 50, pad: 4 },
+      xaxis: { title: 'Period' },
+      yaxis: { title: 'Profit Margin (%)' }
     };
+    
+    Plotly.newPlot(profitabilityChartRef.current, data, layout, { responsive: true });
   };
   
   // Calcular KPIs adicionales
@@ -286,6 +287,112 @@ function Finances() {
     };
   };
   
+  // Función para exportar el informe como PDF
+  const exportReportToPDF = async () => {
+    if (!financialSummary || !cashFlow) return;
+    
+    try {
+      setExporting(true);
+      
+      // Crear un nuevo documento PDF
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      
+      // Añadir título y fecha
+      pdf.setFontSize(18);
+      pdf.setTextColor(44, 62, 80);
+      pdf.text('Informe Financiero', pageWidth / 2, 15, { align: 'center' });
+      
+      pdf.setFontSize(10);
+      pdf.setTextColor(100, 100, 100);
+      const today = new Date().toLocaleDateString();
+      pdf.text(`Generado el: ${today}`, pageWidth / 2, 22, { align: 'center' });
+      
+      // Añadir resumen financiero
+      pdf.setFontSize(14);
+      pdf.setTextColor(44, 62, 80);
+      pdf.text('Resumen Financiero', 14, 30);
+      
+      pdf.setFontSize(10);
+      pdf.setTextColor(0, 0, 0);
+      pdf.text(`Ventas Totales: $${formatNumber(financialSummary.total_sales)}`, 14, 38);
+      pdf.text(`Gastos Totales: $${formatNumber(financialSummary.total_expenses)}`, 14, 44);
+      pdf.text(`Beneficio Neto: $${formatNumber(financialSummary.net_profit)}`, 14, 50);
+      pdf.text(`Margen de Beneficio: ${formatNumber(financialSummary.profit_margin)}%`, 14, 56);
+      
+      // Capturar las gráficas como imágenes
+      const captureAndAddChart = async (ref, title, yPosition) => {
+        if (!ref.current) return yPosition;
+        
+        try {
+          const canvas = await html2canvas(ref.current, {
+            scale: 2,
+            logging: false,
+            useCORS: true
+          });
+          
+          const imgData = canvas.toDataURL('image/png');
+          const imgWidth = pageWidth - 28; // Margen de 14mm en cada lado
+          const imgHeight = (canvas.height * imgWidth) / canvas.width;
+          
+          // Verificar si necesitamos una nueva página
+          if (yPosition + imgHeight + 20 > pageHeight) {
+            pdf.addPage();
+            yPosition = 20;
+          }
+          
+          pdf.setFontSize(12);
+          pdf.setTextColor(44, 62, 80);
+          pdf.text(title, 14, yPosition);
+          
+          pdf.addImage(imgData, 'PNG', 14, yPosition + 5, imgWidth, imgHeight);
+          
+          return yPosition + imgHeight + 20; // Devolver la nueva posición Y
+        } catch (err) {
+          console.error(`Error capturing chart ${title}:`, err);
+          return yPosition + 10;
+        }
+      };
+      
+      // Añadir KPIs adicionales
+      pdf.addPage();
+      pdf.setFontSize(14);
+      pdf.setTextColor(44, 62, 80);
+      pdf.text('Indicadores Clave de Rendimiento (KPIs)', 14, 20);
+      
+      const additionalKPIs = calculateAdditionalKPIs();
+      if (additionalKPIs) {
+        pdf.setFontSize(10);
+        pdf.setTextColor(0, 0, 0);
+        pdf.text(`ROI: ${formatNumber(additionalKPIs.roi)}%`, 14, 30);
+        pdf.text(`Ratio de Liquidez: ${formatNumber(additionalKPIs.currentRatio)}`, 14, 36);
+        pdf.text(`Eficiencia Operativa: ${formatNumber(additionalKPIs.operationalEfficiency)}%`, 14, 42);
+        pdf.text(`Volatilidad del Flujo de Caja: ${formatNumber(additionalKPIs.cashFlowVolatility)}%`, 14, 48);
+        pdf.text(`Tasa de Crecimiento: ${formatNumber(additionalKPIs.growthRate)}%`, 14, 54);
+      }
+      
+      // Capturar y añadir las gráficas
+      let yPos = 65;
+      yPos = await captureAndAddChart(cashFlowChartRef, 'Análisis de Flujo de Caja', yPos);
+      yPos = await captureAndAddChart(accumulatedCashFlowChartRef, 'Flujo de Caja Acumulado', yPos);
+      
+      pdf.addPage();
+      yPos = 20;
+      yPos = await captureAndAddChart(cashFlowCompositionRef, 'Composición del Flujo de Caja', yPos);
+      yPos = await captureAndAddChart(profitabilityChartRef, 'Análisis de Rentabilidad', yPos);
+      
+      // Guardar el PDF
+      pdf.save('informe_financiero.pdf');
+      
+      setExporting(false);
+    } catch (err) {
+      console.error('Error exporting report:', err);
+      setExporting(false);
+      alert('Error al exportar el informe: ' + err.message);
+    }
+  };
+  
   // Obtener KPIs adicionales
   const additionalKPIs = calculateAdditionalKPIs();
   
@@ -311,7 +418,7 @@ function Finances() {
   }
 
   return (
-    <div className="p-4">
+    <div className="p-4" ref={reportContainerRef}>
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center py-5 px-4 sm:px-6 lg:px-8 border-b border-gray-200 mb-5">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Financial Analysis</h1>
@@ -323,24 +430,35 @@ function Finances() {
           <button
             type="button"
             className="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none"
+            onClick={exportReportToPDF}
+            disabled={loading || exporting || !financialSummary}
           >
-            <svg
-              className="flex-shrink-0 w-4 h-4"
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" x2="12" y1="15" y2="3" />
-            </svg>
-            Export Report
+            {exporting ? (
+              <>
+                <div className="animate-spin inline-block w-4 h-4 border-[2px] border-current border-t-transparent text-blue-600 rounded-full" role="status" aria-label="loading"></div>
+                Exporting...
+              </>
+            ) : (
+              <>
+                <svg
+                  className="flex-shrink-0 w-4 h-4"
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" x2="12" y1="15" y2="3" />
+                </svg>
+                Export Report
+              </>
+            )}
           </button>
         </div>
       </header>
@@ -363,6 +481,9 @@ function Finances() {
           <div className="mt-2">
             <span className="text-xs text-gray-500">Last 5 months</span>
           </div>
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <p className="text-xs text-gray-600">Total revenue generated from all sales activities. Includes all product sales, services, and other revenue streams.</p>
+          </div>
         </div>
         
         <div className="p-4 bg-white border rounded-lg shadow-sm">
@@ -380,6 +501,9 @@ function Finances() {
           </div>
           <div className="mt-2">
             <span className="text-xs text-gray-500">Last 5 months</span>
+          </div>
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <p className="text-xs text-gray-600">Sum of all operational costs, including COGS, salaries, rent, utilities, marketing, and other business expenses.</p>
           </div>
         </div>
         
@@ -400,6 +524,9 @@ function Finances() {
           <div className="mt-2">
             <span className="text-xs text-gray-500">Last 5 months</span>
           </div>
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <p className="text-xs text-gray-600">Calculated as Total Sales minus Total Expenses. Represents the actual profit after all costs have been deducted.</p>
+          </div>
         </div>
       </div>
       
@@ -411,6 +538,9 @@ function Finances() {
           <div className="mt-2">
             <span className="text-xs text-gray-500">Overall performance</span>
           </div>
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <p className="text-xs text-gray-600">Calculated as (Net Profit / Total Sales) × 100. Indicates what percentage of sales is converted to actual profit after all expenses.</p>
+          </div>
         </div>
         
         <div className="p-4 bg-white border rounded-lg shadow-sm">
@@ -421,6 +551,9 @@ function Finances() {
           <div className="mt-2">
             <span className="text-xs text-gray-500">Outstanding payments</span>
           </div>
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <p className="text-xs text-gray-600">Money owed to your company by customers for goods or services delivered but not yet paid for. Negative values indicate prepayments or credits.</p>
+          </div>
         </div>
         
         <div className="p-4 bg-white border rounded-lg shadow-sm">
@@ -430,6 +563,9 @@ function Finances() {
           </p>
           <div className="mt-2">
             <span className="text-xs text-gray-500">Pending payments</span>
+          </div>
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <p className="text-xs text-gray-600">Money your company owes to suppliers or vendors for goods or services received but not yet paid for. Affects cash flow and liquidity.</p>
           </div>
         </div>
       </div>
@@ -442,6 +578,9 @@ function Finances() {
           <div className="mt-2">
             <span className="text-xs text-gray-500">Return on Investment</span>
           </div>
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <p className="text-xs text-gray-600">Calculated as (Net Profit / Total Expenses) × 100. Measures how efficiently investments generate profit relative to their cost.</p>
+          </div>
         </div>
         
         <div className="p-4 bg-white border rounded-lg shadow-sm">
@@ -449,6 +588,9 @@ function Finances() {
           <p className="text-2xl font-bold text-teal-600">{formatNumber(additionalKPIs.currentRatio)}</p>
           <div className="mt-2">
             <span className="text-xs text-gray-500">Liquidity measure</span>
+          </div>
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <p className="text-xs text-gray-600">Calculated as Accounts Receivable / Accounts Payable. Indicates ability to pay short-term obligations. Ratio greater than 1 is generally favorable.</p>
           </div>
         </div>
         
@@ -458,6 +600,9 @@ function Finances() {
           <div className="mt-2">
             <span className="text-xs text-gray-500">Cost effectiveness</span>
           </div>
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <p className="text-xs text-gray-600">Calculated as (Total Sales / Total Expenses) × 100. Measures how efficiently the company converts expenses into revenue.</p>
+          </div>
         </div>
         
         <div className="p-4 bg-white border rounded-lg shadow-sm">
@@ -466,6 +611,9 @@ function Finances() {
           <div className="mt-2">
             <span className="text-xs text-gray-500">Year-over-year</span>
           </div>
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <p className="text-xs text-gray-600">Annual percentage increase in revenue. Indicates business expansion rate and market performance compared to previous periods.</p>
+          </div>
         </div>
       </div>
       
@@ -473,16 +621,12 @@ function Finances() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div className="bg-white p-4 rounded-lg shadow-sm">
           <h3 className="text-lg font-semibold mb-4">Cash Flow Analysis</h3>
-          <div className="h-80">
-            {cashFlow && <Line data={prepareCashFlowChartData()} options={{ maintainAspectRatio: false, responsive: true }} />}
-          </div>
+          <div className="h-80" ref={cashFlowChartRef}></div>
         </div>
         
         <div className="bg-white p-4 rounded-lg shadow-sm">
           <h3 className="text-lg font-semibold mb-4">Accumulated Cash Flow</h3>
-          <div className="h-80">
-            {cashFlow && <Line data={prepareAccumulatedCashFlowChartData()} options={{ maintainAspectRatio: false, responsive: true }} />}
-          </div>
+          <div className="h-80" ref={accumulatedCashFlowChartRef}></div>
         </div>
       </div>
       
@@ -490,31 +634,12 @@ function Finances() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white p-4 rounded-lg shadow-sm">
           <h3 className="text-lg font-semibold mb-4">Cash Flow Composition</h3>
-          <div className="h-80 flex justify-center items-center">
-            {financialSummary && (
-              <div style={{ width: '70%', height: '70%' }}>
-                <Doughnut 
-                  data={prepareCashFlowCompositionData()} 
-                  options={{ 
-                    maintainAspectRatio: true, 
-                    responsive: true,
-                    plugins: {
-                      legend: {
-                        position: 'bottom',
-                      }
-                    }
-                  }} 
-                />
-              </div>
-            )}
-          </div>
+          <div className="h-80" ref={cashFlowCompositionRef}></div>
         </div>
         
         <div className="bg-white p-4 rounded-lg shadow-sm">
           <h3 className="text-lg font-semibold mb-4">Profitability Analysis</h3>
-          <div className="h-80">
-            {financialSummary && <Bar data={prepareProfitabilityChartData()} options={{ maintainAspectRatio: false, responsive: true }} />}
-          </div>
+          <div className="h-80" ref={profitabilityChartRef}></div>
         </div>
       </div>
       
