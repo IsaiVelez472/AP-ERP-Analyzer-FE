@@ -131,10 +131,13 @@ function Finances() {
     if (!cashFlow || !cashFlowChartRef.current) return;
 
     const periods = cashFlow.periods;
+    
+    // Formatear los períodos para mostrar nombres de meses
+    const formattedPeriods = periods.map(formatPeriod);
 
     const traces = [
       {
-        x: periods,
+        x: formattedPeriods,
         y: periods.map((period) => cashFlow.operating_cash_flow[period]),
         type: "scatter",
         mode: "lines+markers",
@@ -142,7 +145,7 @@ function Finances() {
         line: { color: "rgb(53, 162, 235)", width: 2 },
       },
       {
-        x: periods,
+        x: formattedPeriods,
         y: periods.map((period) => cashFlow.financing_cash_flow[period] || 0),
         type: "scatter",
         mode: "lines+markers",
@@ -150,7 +153,7 @@ function Finances() {
         line: { color: "rgb(75, 192, 192)", width: 2 },
       },
       {
-        x: periods,
+        x: formattedPeriods,
         y: periods.map((period) => cashFlow.total_cash_flow[period]),
         type: "scatter",
         mode: "lines+markers",
@@ -169,6 +172,7 @@ function Finances() {
           font: { size: 14 },
           standoff: 25, // Aumentar la distancia entre el eje y el título
         },
+        type: "category",
       },
       yaxis: { title: "Amount" },
       legend: { orientation: "h", y: -0.3 }, // Ajustar la posición de la leyenda
@@ -178,31 +182,66 @@ function Finances() {
       responsive: true,
     });
   };
+  
+  // Función para formatear período (YYYY-MM a Month YYYY)
+  const formatPeriod = (period) => {
+    if (!period) return "";
+
+    const [year, month] = period.split("-");
+    const monthNames = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+    
+    // Month is 0-indexed in JavaScript Date, but our input is 1-indexed
+    const monthIndex = parseInt(month, 10) - 1;
+    return `${monthNames[monthIndex]} ${year}`;
+  };
 
   // Función para crear el gráfico de flujo de caja acumulado con Plotly
   const createAccumulatedCashFlowChart = () => {
     if (!cashFlow || !accumulatedCashFlowChartRef.current) return;
 
     const periods = cashFlow.periods;
+    const accumulatedValues = periods.map((period) => cashFlow.accumulated_cash_flow[period]);
+    
+    // Formatear los períodos para mostrar nombres de meses
+    const formattedPeriods = periods.map(formatPeriod);
+
+    // Crear colores basados en si el valor es positivo o negativo
+    const colors = accumulatedValues.map((value) => 
+      value >= 0 ? "rgba(53, 162, 235, 0.8)" : "rgba(255, 99, 132, 0.8)"
+    );
 
     const traces = [
       {
-        x: periods,
-        y: periods.map((period) => cashFlow.accumulated_cash_flow[period]),
-        type: "scatter",
-        mode: "lines+markers",
+        x: formattedPeriods,
+        y: accumulatedValues,
+        type: "bar",
         name: "Accumulated Cash Flow",
-        fill: "tozeroy",
-        line: { color: "rgb(153, 102, 255)", width: 2 },
+        marker: {
+          color: colors
+        },
+        text: accumulatedValues.map(value => formatNumber(value)),
+        textposition: "auto",
       },
     ];
 
     const layout = {
       title: "Accumulated Cash Flow",
       autosize: true,
-      margin: { l: 50, r: 50, b: 50, t: 50, pad: 4 },
-      xaxis: { title: "Period" },
-      yaxis: { title: "Amount" },
+      margin: { l: 50, r: 50, b: 80, t: 50, pad: 4 },
+      xaxis: { 
+        title: "Period",
+        type: "category",
+      },
+      yaxis: { 
+        title: "Amount",
+        zeroline: true,
+        zerolinecolor: "#969696",
+        zerolinewidth: 2,
+      },
+      bargap: 0.3,
     };
 
     Plotly.newPlot(accumulatedCashFlowChartRef.current, traces, layout, {
@@ -1101,12 +1140,10 @@ function Finances() {
       {/* Cash Flow Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div className="bg-white p-4 rounded-lg shadow-sm">
-          <h3 className="text-lg font-semibold mb-4">Cash Flow Analysis</h3>
           <div className="h-80" ref={cashFlowChartRef}></div>
         </div>
 
         <div className="bg-white p-4 rounded-lg shadow-sm">
-          <h3 className="text-lg font-semibold mb-4">Accumulated Cash Flow</h3>
           <div className="h-80" ref={accumulatedCashFlowChartRef}></div>
         </div>
       </div>
