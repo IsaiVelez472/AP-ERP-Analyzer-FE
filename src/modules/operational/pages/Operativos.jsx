@@ -94,19 +94,17 @@ function Operativos() {
     return () => clearTimeout(timer);
   }, [loading, expensesData, expensesByPeriod, expensesBySupplier]);
 
-
-
   // Helper function to format numbers with commas and 2 decimal places
   const formatNumber = (number) => {
     if (number === null || number === undefined) return "N/A";
 
     // Handle very large numbers with units (t, b, m) instead of scientific notation
     if (Math.abs(number) >= 1e12) {
-      return (number / 1e12).toFixed(2) + 't';
+      return (number / 1e12).toFixed(2) + "t";
     } else if (Math.abs(number) >= 1e9) {
-      return (number / 1e9).toFixed(2) + 'b';
+      return (number / 1e9).toFixed(2) + "b";
     } else if (Math.abs(number) >= 1e6) {
-      return (number / 1e6).toFixed(2) + 'm';
+      return (number / 1e6).toFixed(2) + "m";
     }
 
     // Format regular numbers
@@ -305,14 +303,6 @@ function Operativos() {
       efficiencyMetric,
     };
   };
-
-
-
-
-
-
-
-
 
   // Get derived metrics for KPIs
   const metrics = calculateDerivedMetrics();
@@ -541,8 +531,6 @@ function Operativos() {
           </div>
         </div>
       </div>
-
-
 
       {/* Table: Top Suppliers */}
       <div className="mb-8">

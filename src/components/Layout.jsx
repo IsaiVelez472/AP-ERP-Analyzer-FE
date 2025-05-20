@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Navbar from './Navbar';
+import Footer from './Footer';
 import { reinitPreline } from '../utils/preline';
 
 function Layout() {
@@ -11,12 +12,17 @@ function Layout() {
   }, []);
 
   return (
-    <div className="bg-gray-50">
+    <div className="bg-gray-50 min-h-screen">
       <Sidebar />
       
-      <div className="w-full pt-10 px-4 sm:px-6 md:px-8 lg:ps-72">
-        <Navbar />
-        <Outlet />
+      <div className="lg:ps-72 flex flex-col min-h-screen">
+        <div className="pt-10 px-4 sm:px-6 md:px-8">
+          <Navbar />
+        </div>
+        <main className="flex-grow px-4 sm:px-6 md:px-8">
+          <Outlet />
+        </main>
+        <Footer />
       </div>
     </div>
   );
