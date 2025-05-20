@@ -125,16 +125,30 @@ function Sales() {
   const salesGrowthChartRef = useRef(null);
   const topCustomersChartRef = useRef(null);
   
+  // Function to format period string (e.g., '2024-02' to 'February 2024')
+  const formatPeriod = (periodStr) => {
+    const [year, month] = periodStr.split('-');
+    const monthNames = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    
+    // Month is 0-indexed in JavaScript Date, but our input is 1-indexed
+    const monthIndex = parseInt(month, 10) - 1;
+    return `${monthNames[monthIndex]} ${year}`;
+  };
+  
   // Function to create the sales chart with Plotly
   const createSalesChart = () => {
     if (!salesByPeriod || !salesChartRef.current) return;
     
     const periods = salesByPeriod.periods;
+    const formattedPeriods = periods.map(formatPeriod);
     const sales = salesByPeriod.sales;
     
     const traces = [
       {
-        x: periods,
+        x: formattedPeriods,
         y: sales,
         type: 'bar',
         name: 'Sales',
@@ -160,11 +174,12 @@ function Sales() {
     if (!salesByPeriod || !salesGrowthChartRef.current) return;
     
     const periods = salesByPeriod.periods;
+    const formattedPeriods = periods.map(formatPeriod);
     const growth = salesByPeriod.growth;
     
     const traces = [
       {
-        x: periods,
+        x: formattedPeriods,
         y: growth,
         type: 'scatter',
         mode: 'lines+markers',
