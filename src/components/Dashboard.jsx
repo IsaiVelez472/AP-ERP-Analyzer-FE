@@ -1,10 +1,20 @@
-import React from "react";
-import StatCards from "./StatCards";
+import { useFilter } from '../context/FilterContext';
 import RecentTransactions from "./RecentTransactions";
 import SalesChart from "./SalesChart";
+import StatCards from "./StatCards";
 import TopProducts from "./TopProducts";
 
 function Dashboard() {
+  const { filterCards } = useFilter();
+  
+  // Asumiendo que tienes un array de tarjetas como este:
+  const allCards = [
+    // ...existing cards data...
+  ];
+
+  // Aplicar el filtro a las tarjetas
+  const filteredCards = filterCards(allCards);
+
   return (
     <>
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center py-5 px-4 sm:px-6 lg:px-8 border-b border-gray-200">
@@ -57,6 +67,19 @@ function Dashboard() {
 
         <div className="mt-6">
           <RecentTransactions />
+        </div>
+
+        <div className="max-w-[85rem] px-4 py-10 sm:px-6 lg:px-8 lg:py-14 mx-auto">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredCards.map((card, index) => (
+              <div 
+                key={index}
+                className="group flex flex-col h-full bg-white border border-gray-200 shadow-sm rounded-xl"
+              >
+                {/* ...existing card content... */}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </>

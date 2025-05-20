@@ -1,8 +1,8 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
-import Sidebar from './Sidebar';
-import Navbar from './Navbar';
 import { reinitPreline } from '../utils/preline';
+import Navbar from './Navbar';
+import Sidebar from './Sidebar';
 
 function Layout() {
   // Re-initialize Preline components when the layout renders

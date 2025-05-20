@@ -2,11 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { reinitPreline } from '../../../utils/preline';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { useFilter } from '../../../context/FilterContext';
 
 // Importar Plotly desde window global
 const Plotly = window.Plotly;
 
 function Finances() {
+  const { filterCards } = useFilter();
   const [financialSummary, setFinancialSummary] = useState(null);
   const [cashFlow, setCashFlow] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -393,6 +395,239 @@ function Finances() {
     }
   };
   
+  // Función para estructurar las KPI cards para el filtrado
+  const getKpiCards = () => {
+    if (!financialSummary || !additionalKPIs) return [];
+
+    return [
+      {
+        id: 'total-sales',
+        title: 'Total Sales',
+        category: 'financial',
+        description: 'Total revenue generated from all sales activities',
+        searchableContent: `Total Sales ${formatNumber(financialSummary.total_sales)} revenue sales income`,
+        element: (
+          <div className="p-4 bg-white border rounded-lg shadow-sm">
+            <div className="flex items-center gap-x-3">
+              <div className="inline-flex justify-center items-center w-10 h-10 rounded-full bg-green-100">
+                <svg className="flex-shrink-0 w-5 h-5 text-green-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" x2="12" y1="2" y2="22" />
+                  <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-600">Total Sales</h3>
+                <p className="text-2xl font-bold text-green-600">${formatNumber(financialSummary.total_sales)}</p>
+              </div>
+            </div>
+            <div className="mt-2">
+              <span className="text-xs text-gray-500">Last 5 months</span>
+            </div>
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <p className="text-xs text-gray-600">Total revenue generated from all sales activities. Includes all product sales, services, and other revenue streams.</p>
+            </div>
+          </div>
+        )
+      },
+      {
+        id: 'total-expenses',
+        title: 'Total Expenses',
+        category: 'financial',
+        description: 'Total operational costs including COGS, salaries, rent, utilities, marketing, and other business expenses',
+        searchableContent: `Total Expenses ${formatNumber(financialSummary.total_expenses)} operational costs`,
+        element: (
+          <div className="p-4 bg-white border rounded-lg shadow-sm">
+            <div className="flex items-center gap-x-3">
+              <div className="inline-flex justify-center items-center w-10 h-10 rounded-full bg-red-100">
+                <svg className="flex-shrink-0 w-5 h-5 text-red-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect width="20" height="14" x="2" y="5" rx="2" />
+                  <line x1="2" x2="22" y1="10" y2="10" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-600">Total Expenses</h3>
+                <p className="text-2xl font-bold text-red-600">${formatNumber(financialSummary.total_expenses)}</p>
+              </div>
+            </div>
+            <div className="mt-2">
+              <span className="text-xs text-gray-500">Last 5 months</span>
+            </div>
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <p className="text-xs text-gray-600">Sum of all operational costs, including COGS, salaries, rent, utilities, marketing, and other business expenses.</p>
+            </div>
+          </div>
+        )
+      },
+      {
+        id: 'net-profit',
+        title: 'Net Profit',
+        category: 'financial',
+        description: 'Actual profit after all costs have been deducted',
+        searchableContent: `Net Profit ${formatNumber(financialSummary.net_profit)} profit`,
+        element: (
+          <div className="p-4 bg-white border rounded-lg shadow-sm">
+            <div className="flex items-center gap-x-3">
+              <div className="inline-flex justify-center items-center w-10 h-10 rounded-full bg-blue-100">
+                <svg className="flex-shrink-0 w-5 h-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-600">Net Profit</h3>
+                <p className={`text-2xl font-bold ${getValueColor(financialSummary.net_profit)}`}>
+                  ${formatNumber(financialSummary.net_profit)} {getTrend(financialSummary.net_profit)}
+                </p>
+              </div>
+            </div>
+            <div className="mt-2">
+              <span className="text-xs text-gray-500">Last 5 months</span>
+            </div>
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <p className="text-xs text-gray-600">Calculated as Total Sales minus Total Expenses. Represents the actual profit after all costs have been deducted.</p>
+            </div>
+          </div>
+        )
+      },
+      {
+        id: 'profit-margin',
+        title: 'Profit Margin',
+        category: 'metrics',
+        description: 'Indicates what percentage of sales is converted to actual profit after all expenses',
+        searchableContent: `Profit Margin ${formatNumber(financialSummary.profit_margin)}%`,
+        element: (
+          <div className="p-4 bg-white border rounded-lg shadow-sm">
+            <h3 className="text-sm font-medium text-gray-600">Profit Margin</h3>
+            <p className="text-2xl font-bold text-purple-600">{formatNumber(financialSummary.profit_margin)}%</p>
+            <div className="mt-2">
+              <span className="text-xs text-gray-500">Overall performance</span>
+            </div>
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <p className="text-xs text-gray-600">Calculated as (Net Profit / Total Sales) × 100. Indicates what percentage of sales is converted to actual profit after all expenses.</p>
+            </div>
+          </div>
+        )
+      },
+      {
+        id: 'accounts-receivable',
+        title: 'Accounts Receivable',
+        category: 'metrics',
+        description: 'Money owed to your company by customers for goods or services delivered but not yet paid for',
+        searchableContent: `Accounts Receivable ${formatNumber(financialSummary.accounts_receivable)} money owed`,
+        element: (
+          <div className="p-4 bg-white border rounded-lg shadow-sm">
+            <h3 className="text-sm font-medium text-gray-600">Accounts Receivable</h3>
+            <p className={`text-2xl font-bold ${getValueColor(financialSummary.accounts_receivable)}`}>
+              ${formatNumber(financialSummary.accounts_receivable)} {getTrend(financialSummary.accounts_receivable)}
+            </p>
+            <div className="mt-2">
+              <span className="text-xs text-gray-500">Outstanding payments</span>
+            </div>
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <p className="text-xs text-gray-600">Money owed to your company by customers for goods or services delivered but not yet paid for. Negative values indicate prepayments or credits.</p>
+            </div>
+          </div>
+        )
+      },
+      {
+        id: 'accounts-payable',
+        title: 'Accounts Payable',
+        category: 'metrics',
+        description: 'Money your company owes to suppliers or vendors for goods or services received but not yet paid for',
+        searchableContent: `Accounts Payable ${formatNumber(financialSummary.accounts_payable)} money owed`,
+        element: (
+          <div className="p-4 bg-white border rounded-lg shadow-sm">
+            <h3 className="text-sm font-medium text-gray-600">Accounts Payable</h3>
+            <p className={`text-2xl font-bold ${getValueColor(financialSummary.accounts_payable)}`}>
+              ${formatNumber(financialSummary.accounts_payable)} {getTrend(financialSummary.accounts_payable)}
+            </p>
+            <div className="mt-2">
+              <span className="text-xs text-gray-500">Pending payments</span>
+            </div>
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <p className="text-xs text-gray-600">Money your company owes to suppliers or vendors for goods or services received but not yet paid for. Affects cash flow and liquidity.</p>
+            </div>
+          </div>
+        )
+      },
+      {
+        id: 'roi',
+        title: 'ROI',
+        category: 'analytics',
+        description: 'Return on Investment - Measures how efficiently investments generate profit relative to their cost',
+        searchableContent: `ROI ${formatNumber(additionalKPIs.roi)}% return on investment`,
+        element: (
+          <div className="p-4 bg-white border rounded-lg shadow-sm">
+            <h3 className="text-sm font-medium text-gray-600">ROI</h3>
+            <p className="text-2xl font-bold text-indigo-600">{formatNumber(additionalKPIs.roi)}%</p>
+            <div className="mt-2">
+              <span className="text-xs text-gray-500">Return on Investment</span>
+            </div>
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <p className="text-xs text-gray-600">Calculated as (Net Profit / Total Expenses) × 100. Measures how efficiently investments generate profit relative to their cost.</p>
+            </div>
+          </div>
+        )
+      },
+      {
+        id: 'current-ratio',
+        title: 'Current Ratio',
+        category: 'analytics',
+        description: 'Liquidity measure - Indicates ability to pay short-term obligations',
+        searchableContent: `Current Ratio ${formatNumber(additionalKPIs.currentRatio)} liquidity`,
+        element: (
+          <div className="p-4 bg-white border rounded-lg shadow-sm">
+            <h3 className="text-sm font-medium text-gray-600">Current Ratio</h3>
+            <p className="text-2xl font-bold text-teal-600">{formatNumber(additionalKPIs.currentRatio)}</p>
+            <div className="mt-2">
+              <span className="text-xs text-gray-500">Liquidity measure</span>
+            </div>
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <p className="text-xs text-gray-600">Calculated as Accounts Receivable / Accounts Payable. Indicates ability to pay short-term obligations. Ratio greater than 1 is generally favorable.</p>
+            </div>
+          </div>
+        )
+      },
+      {
+        id: 'operational-efficiency',
+        title: 'Operational Efficiency',
+        category: 'analytics',
+        description: 'Cost effectiveness - Measures how efficiently the company converts expenses into revenue',
+        searchableContent: `Operational Efficiency ${formatNumber(additionalKPIs.operationalEfficiency)}% efficiency`,
+        element: (
+          <div className="p-4 bg-white border rounded-lg shadow-sm">
+            <h3 className="text-sm font-medium text-gray-600">Operational Efficiency</h3>
+            <p className="text-2xl font-bold text-amber-600">{formatNumber(additionalKPIs.operationalEfficiency)}%</p>
+            <div className="mt-2">
+              <span className="text-xs text-gray-500">Cost effectiveness</span>
+            </div>
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <p className="text-xs text-gray-600">Calculated as (Total Sales / Total Expenses) × 100. Measures how efficiently the company converts expenses into revenue.</p>
+            </div>
+          </div>
+        )
+      },
+      {
+        id: 'growth-rate',
+        title: 'Growth Rate',
+        category: 'analytics',
+        description: 'Annual percentage increase in revenue - Indicates business expansion rate',
+        searchableContent: `Growth Rate ${formatNumber(additionalKPIs.growthRate)}%`,
+        element: (
+          <div className="p-4 bg-white border rounded-lg shadow-sm">
+            <h3 className="text-sm font-medium text-gray-600">Growth Rate</h3>
+            <p className="text-2xl font-bold text-emerald-600">{formatNumber(additionalKPIs.growthRate)}%</p>
+            <div className="mt-2">
+              <span className="text-xs text-gray-500">Year-over-year</span>
+            </div>
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <p className="text-xs text-gray-600">Annual percentage increase in revenue. Indicates business expansion rate and market performance compared to previous periods.</p>
+            </div>
+          </div>
+        )
+      }
+    ];
+  };
+  
   // Obtener KPIs adicionales
   const additionalKPIs = calculateAdditionalKPIs();
   
@@ -465,156 +700,23 @@ function Finances() {
 
       {/* KPI 1-3: Financial Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="p-4 bg-white border rounded-lg shadow-sm">
-          <div className="flex items-center gap-x-3">
-            <div className="inline-flex justify-center items-center w-10 h-10 rounded-full bg-green-100">
-              <svg className="flex-shrink-0 w-5 h-5 text-green-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" x2="12" y1="2" y2="22" />
-                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-gray-600">Total Sales</h3>
-              <p className="text-2xl font-bold text-green-600">${formatNumber(financialSummary.total_sales)}</p>
-            </div>
-          </div>
-          <div className="mt-2">
-            <span className="text-xs text-gray-500">Last 5 months</span>
-          </div>
-          <div className="mt-3 pt-3 border-t border-gray-100">
-            <p className="text-xs text-gray-600">Total revenue generated from all sales activities. Includes all product sales, services, and other revenue streams.</p>
-          </div>
-        </div>
-        
-        <div className="p-4 bg-white border rounded-lg shadow-sm">
-          <div className="flex items-center gap-x-3">
-            <div className="inline-flex justify-center items-center w-10 h-10 rounded-full bg-red-100">
-              <svg className="flex-shrink-0 w-5 h-5 text-red-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect width="20" height="14" x="2" y="5" rx="2" />
-                <line x1="2" x2="22" y1="10" y2="10" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-gray-600">Total Expenses</h3>
-              <p className="text-2xl font-bold text-red-600">${formatNumber(financialSummary.total_expenses)}</p>
-            </div>
-          </div>
-          <div className="mt-2">
-            <span className="text-xs text-gray-500">Last 5 months</span>
-          </div>
-          <div className="mt-3 pt-3 border-t border-gray-100">
-            <p className="text-xs text-gray-600">Sum of all operational costs, including COGS, salaries, rent, utilities, marketing, and other business expenses.</p>
-          </div>
-        </div>
-        
-        <div className="p-4 bg-white border rounded-lg shadow-sm">
-          <div className="flex items-center gap-x-3">
-            <div className="inline-flex justify-center items-center w-10 h-10 rounded-full bg-blue-100">
-              <svg className="flex-shrink-0 w-5 h-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-gray-600">Net Profit</h3>
-              <p className={`text-2xl font-bold ${getValueColor(financialSummary.net_profit)}`}>
-                ${formatNumber(financialSummary.net_profit)} {getTrend(financialSummary.net_profit)}
-              </p>
-            </div>
-          </div>
-          <div className="mt-2">
-            <span className="text-xs text-gray-500">Last 5 months</span>
-          </div>
-          <div className="mt-3 pt-3 border-t border-gray-100">
-            <p className="text-xs text-gray-600">Calculated as Total Sales minus Total Expenses. Represents the actual profit after all costs have been deducted.</p>
-          </div>
-        </div>
+        {filterCards(getKpiCards())
+          .filter(card => card.category === 'financial')
+          .map(card => card.element)}
       </div>
       
       {/* KPI 4-6: Additional Financial Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="p-4 bg-white border rounded-lg shadow-sm">
-          <h3 className="text-sm font-medium text-gray-600">Profit Margin</h3>
-          <p className="text-2xl font-bold text-purple-600">{formatNumber(financialSummary.profit_margin)}%</p>
-          <div className="mt-2">
-            <span className="text-xs text-gray-500">Overall performance</span>
-          </div>
-          <div className="mt-3 pt-3 border-t border-gray-100">
-            <p className="text-xs text-gray-600">Calculated as (Net Profit / Total Sales) × 100. Indicates what percentage of sales is converted to actual profit after all expenses.</p>
-          </div>
-        </div>
-        
-        <div className="p-4 bg-white border rounded-lg shadow-sm">
-          <h3 className="text-sm font-medium text-gray-600">Accounts Receivable</h3>
-          <p className={`text-2xl font-bold ${getValueColor(financialSummary.accounts_receivable)}`}>
-            ${formatNumber(financialSummary.accounts_receivable)} {getTrend(financialSummary.accounts_receivable)}
-          </p>
-          <div className="mt-2">
-            <span className="text-xs text-gray-500">Outstanding payments</span>
-          </div>
-          <div className="mt-3 pt-3 border-t border-gray-100">
-            <p className="text-xs text-gray-600">Money owed to your company by customers for goods or services delivered but not yet paid for. Negative values indicate prepayments or credits.</p>
-          </div>
-        </div>
-        
-        <div className="p-4 bg-white border rounded-lg shadow-sm">
-          <h3 className="text-sm font-medium text-gray-600">Accounts Payable</h3>
-          <p className={`text-2xl font-bold ${getValueColor(financialSummary.accounts_payable)}`}>
-            ${formatNumber(financialSummary.accounts_payable)} {getTrend(financialSummary.accounts_payable)}
-          </p>
-          <div className="mt-2">
-            <span className="text-xs text-gray-500">Pending payments</span>
-          </div>
-          <div className="mt-3 pt-3 border-t border-gray-100">
-            <p className="text-xs text-gray-600">Money your company owes to suppliers or vendors for goods or services received but not yet paid for. Affects cash flow and liquidity.</p>
-          </div>
-        </div>
+        {filterCards(getKpiCards())
+          .filter(card => card.category === 'metrics')
+          .map(card => card.element)}
       </div>
       
       {/* KPI 7-10: Advanced Analytics Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="p-4 bg-white border rounded-lg shadow-sm">
-          <h3 className="text-sm font-medium text-gray-600">ROI</h3>
-          <p className="text-2xl font-bold text-indigo-600">{formatNumber(additionalKPIs.roi)}%</p>
-          <div className="mt-2">
-            <span className="text-xs text-gray-500">Return on Investment</span>
-          </div>
-          <div className="mt-3 pt-3 border-t border-gray-100">
-            <p className="text-xs text-gray-600">Calculated as (Net Profit / Total Expenses) × 100. Measures how efficiently investments generate profit relative to their cost.</p>
-          </div>
-        </div>
-        
-        <div className="p-4 bg-white border rounded-lg shadow-sm">
-          <h3 className="text-sm font-medium text-gray-600">Current Ratio</h3>
-          <p className="text-2xl font-bold text-teal-600">{formatNumber(additionalKPIs.currentRatio)}</p>
-          <div className="mt-2">
-            <span className="text-xs text-gray-500">Liquidity measure</span>
-          </div>
-          <div className="mt-3 pt-3 border-t border-gray-100">
-            <p className="text-xs text-gray-600">Calculated as Accounts Receivable / Accounts Payable. Indicates ability to pay short-term obligations. Ratio greater than 1 is generally favorable.</p>
-          </div>
-        </div>
-        
-        <div className="p-4 bg-white border rounded-lg shadow-sm">
-          <h3 className="text-sm font-medium text-gray-600">Operational Efficiency</h3>
-          <p className="text-2xl font-bold text-amber-600">{formatNumber(additionalKPIs.operationalEfficiency)}%</p>
-          <div className="mt-2">
-            <span className="text-xs text-gray-500">Cost effectiveness</span>
-          </div>
-          <div className="mt-3 pt-3 border-t border-gray-100">
-            <p className="text-xs text-gray-600">Calculated as (Total Sales / Total Expenses) × 100. Measures how efficiently the company converts expenses into revenue.</p>
-          </div>
-        </div>
-        
-        <div className="p-4 bg-white border rounded-lg shadow-sm">
-          <h3 className="text-sm font-medium text-gray-600">Growth Rate</h3>
-          <p className="text-2xl font-bold text-emerald-600">{formatNumber(additionalKPIs.growthRate)}%</p>
-          <div className="mt-2">
-            <span className="text-xs text-gray-500">Year-over-year</span>
-          </div>
-          <div className="mt-3 pt-3 border-t border-gray-100">
-            <p className="text-xs text-gray-600">Annual percentage increase in revenue. Indicates business expansion rate and market performance compared to previous periods.</p>
-          </div>
-        </div>
+        {filterCards(getKpiCards())
+          .filter(card => card.category === 'analytics')
+          .map(card => card.element)}
       </div>
       
       {/* Cash Flow Charts */}
