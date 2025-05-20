@@ -6,6 +6,7 @@ import Finances from "./modules/finance/pages/Finances";
 import Operativos from "./modules/operational/pages/Operativos";
 import Administrativos from "./modules/administrative/pages/Administrativos";
 import Documentacion from "./modules/documentation/pages/Documentacion";
+import Sales from "./modules/sales/pages/Sales";
 
 function App() {
   return (
@@ -15,10 +16,11 @@ function App() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route element={<Layout />}>
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/finanzas" element={<Finances />} />
-            <Route path="/operativos" element={<Operativos />} />
-            <Route path="/administrativos" element={<Administrativos />} />
-            <Route path="/documentacion" element={<Documentacion />} />
+            <Route path="/finance" element={<Finances />} />
+            <Route path="/operations" element={<Operativos />} />
+            <Route path="/administrative" element={<Administrativos />} />
+            <Route path="/sales" element={<Sales />} />
+            <Route path="/documentation" element={<Documentacion />} />
           </Route>
         </Routes>
       </BrowserRouter>
