@@ -60,8 +60,6 @@ function Finances() {
       // Crear los gráficos con Plotly
       createCashFlowChart();
       createAccumulatedCashFlowChart();
-      createCashFlowCompositionChart();
-      createProfitabilityChart();
     }
   }, [financialSummary, cashFlow, loading]);
   
@@ -192,69 +190,9 @@ function Finances() {
     Plotly.newPlot(accumulatedCashFlowChartRef.current, traces, layout, { responsive: true });
   };
   
-  // Función para crear el gráfico de composición del flujo de caja con Plotly
-  const createCashFlowCompositionChart = () => {
-    if (!financialSummary || !cashFlowCompositionRef.current) return;
-    
-    const { cash_flow_summary } = financialSummary;
-    
-    // Usar valores absolutos para el gráfico circular
-    const operatingAbs = Math.abs(cash_flow_summary.operating);
-    const investmentAbs = Math.abs(cash_flow_summary.investment);
-    const financingAbs = Math.abs(cash_flow_summary.financing);
-    
-    const data = [{
-      values: [operatingAbs, investmentAbs, financingAbs],
-      labels: ['Operating', 'Investment', 'Financing'],
-      type: 'pie',
-      hole: 0.4,
-      marker: {
-        colors: [
-          'rgba(255, 99, 132, 0.7)',
-          'rgba(54, 162, 235, 0.7)',
-          'rgba(255, 206, 86, 0.7)'
-        ]
-      }
-    }];
-    
-    const layout = {
-      title: 'Cash Flow Composition',
-      autosize: true,
-      margin: { l: 0, r: 0, b: 0, t: 50, pad: 4 },
-      showlegend: true,
-      legend: { orientation: 'h', y: -0.2 }
-    };
-    
-    Plotly.newPlot(cashFlowCompositionRef.current, data, layout, { responsive: true });
-  };
+  // Ya no se necesita crear un gráfico para la composición del flujo de caja, se usará una tabla
   
-  // Función para crear el gráfico de rentabilidad con Plotly
-  const createProfitabilityChart = () => {
-    if (!financialSummary || !profitabilityChartRef.current) return;
-    
-    // Calcular la rentabilidad mensual (simulada basada en los datos disponibles)
-    const monthlyProfitMargin = Array(5).fill(financialSummary.profit_margin / 5);
-    
-    const data = [{
-      x: financialSummary.periods,
-      y: monthlyProfitMargin,
-      type: 'bar',
-      name: 'Profit Margin (%)',
-      marker: {
-        color: 'rgba(75, 192, 192, 0.7)'
-      }
-    }];
-    
-    const layout = {
-      title: 'Profitability Analysis',
-      autosize: true,
-      margin: { l: 50, r: 50, b: 50, t: 50, pad: 4 },
-      xaxis: { title: 'Period' },
-      yaxis: { title: 'Profit Margin (%)' }
-    };
-    
-    Plotly.newPlot(profitabilityChartRef.current, data, layout, { responsive: true });
-  };
+  // Se eliminó la función para crear el gráfico de rentabilidad
   
   // Calcular KPIs adicionales
   const calculateAdditionalKPIs = () => {
@@ -379,8 +317,43 @@ function Finances() {
       
       pdf.addPage();
       yPos = 20;
-      yPos = await captureAndAddChart(cashFlowCompositionRef, 'Composición del Flujo de Caja', yPos);
-      yPos = await captureAndAddChart(profitabilityChartRef, 'Análisis de Rentabilidad', yPos);
+      // Añadir tabla de composición del flujo de caja al PDF
+      pdf.setFontSize(12);
+      pdf.setTextColor(44, 62, 80);
+      pdf.text('Composición del Flujo de Caja', 14, yPos);
+      yPos += 10;
+      
+      // Crear encabezados de tabla
+      pdf.setFillColor(240, 240, 240);
+      pdf.setDrawColor(200, 200, 200);
+      pdf.setTextColor(0, 0, 0);
+      pdf.setFontSize(10);
+      
+      const { cash_flow_summary } = financialSummary;
+      
+      // Dibujar encabezados de tabla
+      pdf.rect(14, yPos, 90, 8, 'FD');
+      pdf.rect(104, yPos, 90, 8, 'FD');
+      pdf.text('Tipo de Flujo', 16, yPos + 5);
+      pdf.text('Valor', 106, yPos + 5);
+      yPos += 8;
+      
+      // Añadir filas de tabla
+      const cashFlowTypes = [
+        { name: 'Operating', value: cash_flow_summary.operating },
+        { name: 'Investment', value: cash_flow_summary.investment },
+        { name: 'Financing', value: cash_flow_summary.financing },
+        { name: 'Total', value: cash_flow_summary.operating + cash_flow_summary.investment + cash_flow_summary.financing }
+      ];
+      
+      cashFlowTypes.forEach((type, index) => {
+        const rowY = yPos + (index * 8);
+        pdf.setFillColor(255, 255, 255);
+        pdf.rect(14, rowY, 90, 8, 'FD');
+        pdf.rect(104, rowY, 90, 8, 'FD');
+        pdf.text(type.name, 16, rowY + 5);
+        pdf.text('$' + formatNumber(type.value), 106, rowY + 5);
+      });
       
       // Guardar el PDF
       pdf.save('informe_financiero.pdf');
@@ -630,16 +603,54 @@ function Finances() {
         </div>
       </div>
       
-      {/* Additional Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white p-4 rounded-lg shadow-sm">
-          <h3 className="text-lg font-semibold mb-4">Cash Flow Composition</h3>
-          <div className="h-80" ref={cashFlowCompositionRef}></div>
-        </div>
-        
-        <div className="bg-white p-4 rounded-lg shadow-sm">
-          <h3 className="text-lg font-semibold mb-4">Profitability Analysis</h3>
-          <div className="h-80" ref={profitabilityChartRef}></div>
+      {/* Cash Flow Composition Table */}
+      <div className="bg-white p-4 rounded-lg shadow-sm mb-6">
+        <h3 className="text-lg font-semibold mb-4">Cash Flow Composition</h3>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {financialSummary && financialSummary.cash_flow_summary && (
+                <>
+                  <tr>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Operating</td>
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm ${getValueColor(financialSummary.cash_flow_summary.operating)}`}>
+                      ${formatNumber(financialSummary.cash_flow_summary.operating)} {getTrend(financialSummary.cash_flow_summary.operating)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Cash generated or used in day-to-day business operations</td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Investment</td>
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm ${getValueColor(financialSummary.cash_flow_summary.investment)}`}>
+                      ${formatNumber(financialSummary.cash_flow_summary.investment)} {getTrend(financialSummary.cash_flow_summary.investment)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Cash used for acquiring or selling long-term assets</td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Financing</td>
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm ${getValueColor(financialSummary.cash_flow_summary.financing)}`}>
+                      ${formatNumber(financialSummary.cash_flow_summary.financing)} {getTrend(financialSummary.cash_flow_summary.financing)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Cash from or used in financing activities like loans or equity</td>
+                  </tr>
+                  <tr className="bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Total</td>
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${getValueColor(financialSummary.cash_flow_summary.operating + financialSummary.cash_flow_summary.investment + financialSummary.cash_flow_summary.financing)}`}>
+                      ${formatNumber(financialSummary.cash_flow_summary.operating + financialSummary.cash_flow_summary.investment + financialSummary.cash_flow_summary.financing)} 
+                      {getTrend(financialSummary.cash_flow_summary.operating + financialSummary.cash_flow_summary.investment + financialSummary.cash_flow_summary.financing)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700">Net change in cash position during the period</td>
+                  </tr>
+                </>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
       

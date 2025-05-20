@@ -69,7 +69,6 @@ function Administrativos() {
       // Create charts with Plotly
       createReceivablesPayablesChart();
       createStackedAreaChart();
-      createRadarChart();
     }
   }, [accountsData, receivablesData, payablesData, loading]);
   
@@ -220,64 +219,7 @@ function Administrativos() {
     Plotly.newPlot(stackedAreaChartRef.current, traces, layout, { responsive: true });
   };
   
-  // Function to create radar chart
-  const createRadarChart = () => {
-    if (!accountsData || !radarChartRef.current) return;
-    
-    // Normalize values for radar chart (between 0 and 1)
-    const normalizeValue = (value, min, max) => {
-      if (min === max) return 0.5;
-      return (value - min) / (max - min);
-    };
-    
-    // Get the last period data
-    const lastPeriod = accountsData.periods[accountsData.periods.length - 1];
-    const lastReceivable = accountsData.accounts_receivable[lastPeriod];
-    const lastPayable = accountsData.accounts_payable[lastPeriod];
-    
-    // Create metrics for radar chart
-    const metrics = [
-      { name: 'Receivables', value: Math.abs(lastReceivable) },
-      { name: 'Payables', value: Math.abs(lastPayable) },
-      { name: 'Avg Receivables', value: Math.abs(accountsData.avg_accounts_receivable) },
-      { name: 'Avg Payables', value: Math.abs(accountsData.avg_accounts_payable) },
-      { name: 'Receivables Turnover', value: Math.abs(accountsData.receivables_turnover) },
-      { name: 'Payables Turnover', value: Math.abs(accountsData.payables_turnover) }
-    ];
-    
-    // Find min and max for normalization
-    const values = metrics.map(m => m.value);
-    const minValue = Math.min(...values);
-    const maxValue = Math.max(...values);
-    
-    // Normalize values
-    const normalizedValues = metrics.map(m => normalizeValue(m.value, minValue, maxValue));
-    
-    const data = [
-      {
-        type: 'scatterpolar',
-        r: normalizedValues,
-        theta: metrics.map(m => m.name),
-        fill: 'toself',
-        name: 'Accounts Metrics',
-        line: { color: 'rgb(75, 192, 192)' }
-      }
-    ];
-    
-    const layout = {
-      title: 'Accounts Metrics Radar',
-      polar: {
-        radialaxis: {
-          visible: true,
-          range: [0, 1]
-        }
-      },
-      showlegend: false,
-      margin: { l: 50, r: 50, b: 50, t: 50, pad: 4 }
-    };
-    
-    Plotly.newPlot(radarChartRef.current, data, layout, { responsive: true });
-  };
+  // No longer need to create radar chart as we're using a table instead
   
   // Function to export the report as PDF
   const exportReportToPDF = async () => {
@@ -353,9 +295,46 @@ function Administrativos() {
       yPos = 20;
       yPos = await captureAndAddChart(stackedAreaChartRef, 'Accounts Volume (Stacked Area)', yPos);
       
+      // Add metrics table to PDF
       pdf.addPage();
       yPos = 20;
-      yPos = await captureAndAddChart(radarChartRef, 'Accounts Metrics Radar', yPos);
+      pdf.setFontSize(12);
+      pdf.setTextColor(44, 62, 80);
+      pdf.text('Accounts Metrics Summary', 14, yPos);
+      yPos += 10;
+      
+      // Create table headers
+      pdf.setFillColor(240, 240, 240);
+      pdf.setDrawColor(200, 200, 200);
+      pdf.setTextColor(0, 0, 0);
+      pdf.setFontSize(10);
+      
+      // Draw table headers
+      pdf.rect(14, yPos, 90, 8, 'FD');
+      pdf.rect(104, yPos, 90, 8, 'FD');
+      pdf.text('Metric', 16, yPos + 5);
+      pdf.text('Value', 106, yPos + 5);
+      yPos += 8;
+      
+      // Add table rows
+      const lastPeriod = accountsData.periods[accountsData.periods.length - 1];
+      const metrics = [
+        { name: 'Receivables (Latest)', value: formatNumber(accountsData.accounts_receivable[lastPeriod]) },
+        { name: 'Payables (Latest)', value: formatNumber(accountsData.accounts_payable[lastPeriod]) },
+        { name: 'Avg Receivables', value: formatNumber(accountsData.avg_accounts_receivable) },
+        { name: 'Avg Payables', value: formatNumber(accountsData.avg_accounts_payable) },
+        { name: 'Receivables Turnover', value: formatNumber(accountsData.receivables_turnover) },
+        { name: 'Payables Turnover', value: formatNumber(accountsData.payables_turnover) }
+      ];
+      
+      metrics.forEach((metric, index) => {
+        const rowY = yPos + (index * 8);
+        pdf.setFillColor(255, 255, 255);
+        pdf.rect(14, rowY, 90, 8, 'FD');
+        pdf.rect(104, rowY, 90, 8, 'FD');
+        pdf.text(metric.name, 16, rowY + 5);
+        pdf.text('$' + metric.value, 106, rowY + 5);
+      });
       
       // Save the PDF
       pdf.save('administrative_accounts_report.pdf');
@@ -584,7 +563,54 @@ function Administrativos() {
         </div>
         
         <div className="bg-white border rounded-lg shadow-sm p-4">
-          <div ref={radarChartRef} className="w-full h-80"></div>
+          <h3 className="text-lg font-semibold mb-4">Accounts Metrics Summary</h3>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Metric</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {accountsData && (
+                  <>
+                    <tr>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Receivables (Latest)</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatNumber(accountsData.accounts_receivable[accountsData.periods[accountsData.periods.length - 1]])}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Current amount owed to the company</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Payables (Latest)</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatNumber(accountsData.accounts_payable[accountsData.periods[accountsData.periods.length - 1]])}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Current amount the company owes</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Avg Receivables</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatNumber(accountsData.avg_accounts_receivable)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Average amount owed to the company across all periods</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Avg Payables</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatNumber(accountsData.avg_accounts_payable)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Average amount the company owes across all periods</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Receivables Turnover</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatNumber(accountsData.receivables_turnover)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">How quickly customers pay their debts to the company</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Payables Turnover</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatNumber(accountsData.payables_turnover)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">How quickly the company pays its debts to suppliers</td>
+                    </tr>
+                  </>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
