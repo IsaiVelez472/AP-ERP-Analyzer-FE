@@ -2,7 +2,7 @@ import React from 'react';
 
 function Operativos() {
   return (
-    <div className="p-4">
+    <div className="p-4 min-h-[calc(100vh-200px)]">
       <h1 className="text-2xl font-bold mb-4">Operativos</h1>
       <p>Gestión y análisis de operaciones de la empresa.</p>
       
