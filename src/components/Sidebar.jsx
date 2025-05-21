@@ -150,6 +150,34 @@ function Sidebar() {
               Documentation
             </Link>
           </li>
+
+          <li>
+            <Link
+              className={`flex items-center gap-x-3.5 py-2 px-2.5 text-sm text-slate-700 rounded-lg hover:bg-gray-100 ${
+                currentPath === "/ml-predicts" ? "bg-gray-100" : ""
+              }`}
+              to="/ml-predicts"
+            >
+              <svg
+                className="flex-shrink-0 w-4 h-4"
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 22C6.5 22 2 17.5 2 12S6.5 2 12 2s10 4.5 10 10-4.5 10-10 10" />
+                <path d="M10 8v6l5 3" />
+                <path d="m22 12-3 2-2 3" />
+                <path d="m15 17-2 3-3 2" />
+              </svg>
+              ML Predictions
+            </Link>
+          </li>
         </ul>
       </nav>
     </div>
