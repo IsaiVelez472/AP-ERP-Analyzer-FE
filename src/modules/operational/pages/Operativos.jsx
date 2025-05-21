@@ -1,4 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from "react";
+import { reinitPreline } from "../../../utils/preline";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 function Operativos() {
   const [expensesData, setExpensesData] = useState(null);
