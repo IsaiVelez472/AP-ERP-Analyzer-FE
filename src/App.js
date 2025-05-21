@@ -10,6 +10,7 @@ import Operativos from "./modules/operational/pages/Operativos";
 import Administrativos from "./modules/administrative/pages/Administrativos";
 import Documentacion from "./modules/documentation/pages/Documentacion";
 import Sales from "./modules/sales/pages/Sales";
+import MlPredicts from "./modules/ml-predicts/pages/MlPredicts";
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
             <Route path="/administrative" element={<Administrativos />} />
             <Route path="/sales" element={<Sales />} />
             <Route path="/documentation" element={<Documentacion />} />
+            <Route path="/ml-predicts" element={<MlPredicts />} />
           </Route>
         </Routes>
       </BrowserRouter>
