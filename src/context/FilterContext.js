@@ -14,9 +14,8 @@ export const FilterProvider = ({ children }) => {
       const searchableContent = [
         card.title,
         card.description,
-        card.category,
-        card.content,
-        // Agrega aquí más campos para buscar
+        card.searchableContent,
+        // ...existing searchable fields...
       ]
         .filter(Boolean)
         .join(" ")

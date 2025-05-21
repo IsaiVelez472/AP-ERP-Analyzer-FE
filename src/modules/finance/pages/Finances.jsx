@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { reinitPreline } from '../../../utils/preline';
-import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
+import { useEffect, useRef, useState } from 'react';
 import { useFilter } from '../../../context/FilterContext';
+import { reinitPreline } from '../../../utils/preline';
 
 // Importar Plotly desde window global
 const Plotly = window.Plotly;
@@ -395,7 +395,10 @@ function Finances() {
     }
   };
   
-  // Función para estructurar las KPI cards para el filtrado
+  // Obtener KPIs adicionales
+  const additionalKPIs = calculateAdditionalKPIs();
+  
+  // Función getKpiCards actualizada
   const getKpiCards = () => {
     if (!financialSummary || !additionalKPIs) return [];
 
@@ -403,9 +406,9 @@ function Finances() {
       {
         id: 'total-sales',
         title: 'Total Sales',
-        category: 'financial',
-        description: 'Total revenue generated from all sales activities',
-        searchableContent: `Total Sales ${formatNumber(financialSummary.total_sales)} revenue sales income`,
+        category: 'summary',
+        description: 'Total revenue from all activities',
+        searchableContent: `Total Sales ${formatNumber(financialSummary.total_sales)}`,
         element: (
           <div className="p-4 bg-white border rounded-lg shadow-sm">
             <div className="flex items-center gap-x-3">
@@ -432,9 +435,9 @@ function Finances() {
       {
         id: 'total-expenses',
         title: 'Total Expenses',
-        category: 'financial',
-        description: 'Total operational costs including COGS, salaries, rent, utilities, marketing, and other business expenses',
-        searchableContent: `Total Expenses ${formatNumber(financialSummary.total_expenses)} operational costs`,
+        category: 'summary',
+        description: 'Total operational costs',
+        searchableContent: `Total Expenses ${formatNumber(financialSummary.total_expenses)}`,
         element: (
           <div className="p-4 bg-white border rounded-lg shadow-sm">
             <div className="flex items-center gap-x-3">
@@ -461,9 +464,9 @@ function Finances() {
       {
         id: 'net-profit',
         title: 'Net Profit',
-        category: 'financial',
-        description: 'Actual profit after all costs have been deducted',
-        searchableContent: `Net Profit ${formatNumber(financialSummary.net_profit)} profit`,
+        category: 'summary',
+        description: 'Profit after all expenses',
+        searchableContent: `Net Profit ${formatNumber(financialSummary.net_profit)}`,
         element: (
           <div className="p-4 bg-white border rounded-lg shadow-sm">
             <div className="flex items-center gap-x-3">
@@ -491,8 +494,8 @@ function Finances() {
       {
         id: 'profit-margin',
         title: 'Profit Margin',
-        category: 'metrics',
-        description: 'Indicates what percentage of sales is converted to actual profit after all expenses',
+        category: 'summary',
+        description: 'Net profit as a percentage of sales',
         searchableContent: `Profit Margin ${formatNumber(financialSummary.profit_margin)}%`,
         element: (
           <div className="p-4 bg-white border rounded-lg shadow-sm">
@@ -510,9 +513,9 @@ function Finances() {
       {
         id: 'accounts-receivable',
         title: 'Accounts Receivable',
-        category: 'metrics',
-        description: 'Money owed to your company by customers for goods or services delivered but not yet paid for',
-        searchableContent: `Accounts Receivable ${formatNumber(financialSummary.accounts_receivable)} money owed`,
+        category: 'summary',
+        description: 'Money owed by customers',
+        searchableContent: `Accounts Receivable ${formatNumber(financialSummary.accounts_receivable)}`,
         element: (
           <div className="p-4 bg-white border rounded-lg shadow-sm">
             <h3 className="text-sm font-medium text-gray-600">Accounts Receivable</h3>
@@ -531,9 +534,9 @@ function Finances() {
       {
         id: 'accounts-payable',
         title: 'Accounts Payable',
-        category: 'metrics',
-        description: 'Money your company owes to suppliers or vendors for goods or services received but not yet paid for',
-        searchableContent: `Accounts Payable ${formatNumber(financialSummary.accounts_payable)} money owed`,
+        category: 'summary',
+        description: 'Money owed to suppliers',
+        searchableContent: `Accounts Payable ${formatNumber(financialSummary.accounts_payable)}`,
         element: (
           <div className="p-4 bg-white border rounded-lg shadow-sm">
             <h3 className="text-sm font-medium text-gray-600">Accounts Payable</h3>
@@ -551,16 +554,16 @@ function Finances() {
       },
       {
         id: 'roi',
-        title: 'ROI',
-        category: 'analytics',
-        description: 'Return on Investment - Measures how efficiently investments generate profit relative to their cost',
-        searchableContent: `ROI ${formatNumber(additionalKPIs.roi)}% return on investment`,
+        title: 'Return on Investment (ROI)',
+        category: 'metrics',
+        description: 'Return on investment',
+        searchableContent: `ROI ${formatNumber(additionalKPIs.roi)}%`,
         element: (
           <div className="p-4 bg-white border rounded-lg shadow-sm">
-            <h3 className="text-sm font-medium text-gray-600">ROI</h3>
+            <h3 className="text-sm font-medium text-gray-600">Return on Investment (ROI)</h3>
             <p className="text-2xl font-bold text-indigo-600">{formatNumber(additionalKPIs.roi)}%</p>
             <div className="mt-2">
-              <span className="text-xs text-gray-500">Return on Investment</span>
+              <span className="text-xs text-gray-500">Investment performance</span>
             </div>
             <div className="mt-3 pt-3 border-t border-gray-100">
               <p className="text-xs text-gray-600">Calculated as (Net Profit / Total Expenses) × 100. Measures how efficiently investments generate profit relative to their cost.</p>
@@ -571,15 +574,15 @@ function Finances() {
       {
         id: 'current-ratio',
         title: 'Current Ratio',
-        category: 'analytics',
-        description: 'Liquidity measure - Indicates ability to pay short-term obligations',
-        searchableContent: `Current Ratio ${formatNumber(additionalKPIs.currentRatio)} liquidity`,
+        category: 'metrics',
+        description: 'Liquidity measure',
+        searchableContent: `Current Ratio ${formatNumber(additionalKPIs.currentRatio)}`,
         element: (
           <div className="p-4 bg-white border rounded-lg shadow-sm">
             <h3 className="text-sm font-medium text-gray-600">Current Ratio</h3>
             <p className="text-2xl font-bold text-teal-600">{formatNumber(additionalKPIs.currentRatio)}</p>
             <div className="mt-2">
-              <span className="text-xs text-gray-500">Liquidity measure</span>
+              <span className="text-xs text-gray-500">Short-term liquidity</span>
             </div>
             <div className="mt-3 pt-3 border-t border-gray-100">
               <p className="text-xs text-gray-600">Calculated as Accounts Receivable / Accounts Payable. Indicates ability to pay short-term obligations. Ratio greater than 1 is generally favorable.</p>
@@ -590,15 +593,15 @@ function Finances() {
       {
         id: 'operational-efficiency',
         title: 'Operational Efficiency',
-        category: 'analytics',
-        description: 'Cost effectiveness - Measures how efficiently the company converts expenses into revenue',
-        searchableContent: `Operational Efficiency ${formatNumber(additionalKPIs.operationalEfficiency)}% efficiency`,
+        category: 'metrics',
+        description: 'Efficiency of operations',
+        searchableContent: `Operational Efficiency ${formatNumber(additionalKPIs.operationalEfficiency)}%`,
         element: (
           <div className="p-4 bg-white border rounded-lg shadow-sm">
             <h3 className="text-sm font-medium text-gray-600">Operational Efficiency</h3>
             <p className="text-2xl font-bold text-amber-600">{formatNumber(additionalKPIs.operationalEfficiency)}%</p>
             <div className="mt-2">
-              <span className="text-xs text-gray-500">Cost effectiveness</span>
+              <span className="text-xs text-gray-500">Cost management</span>
             </div>
             <div className="mt-3 pt-3 border-t border-gray-100">
               <p className="text-xs text-gray-600">Calculated as (Total Sales / Total Expenses) × 100. Measures how efficiently the company converts expenses into revenue.</p>
@@ -609,15 +612,15 @@ function Finances() {
       {
         id: 'growth-rate',
         title: 'Growth Rate',
-        category: 'analytics',
-        description: 'Annual percentage increase in revenue - Indicates business expansion rate',
+        category: 'metrics',
+        description: 'Year-over-year growth',
         searchableContent: `Growth Rate ${formatNumber(additionalKPIs.growthRate)}%`,
         element: (
           <div className="p-4 bg-white border rounded-lg shadow-sm">
             <h3 className="text-sm font-medium text-gray-600">Growth Rate</h3>
             <p className="text-2xl font-bold text-emerald-600">{formatNumber(additionalKPIs.growthRate)}%</p>
             <div className="mt-2">
-              <span className="text-xs text-gray-500">Year-over-year</span>
+              <span className="text-xs text-gray-500">Business expansion</span>
             </div>
             <div className="mt-3 pt-3 border-t border-gray-100">
               <p className="text-xs text-gray-600">Annual percentage increase in revenue. Indicates business expansion rate and market performance compared to previous periods.</p>
@@ -627,10 +630,7 @@ function Finances() {
       }
     ];
   };
-  
-  // Obtener KPIs adicionales
-  const additionalKPIs = calculateAdditionalKPIs();
-  
+
   if (loading) {
     return (
       <div className="p-4 flex justify-center items-center h-screen">
@@ -698,25 +698,112 @@ function Finances() {
         </div>
       </header>
 
-      {/* KPI 1-3: Financial Summary Cards */}
+      {/* Financial Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         {filterCards(getKpiCards())
-          .filter(card => card.category === 'financial')
+          .filter(card => card.category === 'summary')
           .map(card => card.element)}
       </div>
-      
-      {/* KPI 4-6: Additional Financial Metrics */}
+
+      {/* Additional Financial Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         {filterCards(getKpiCards())
           .filter(card => card.category === 'metrics')
           .map(card => card.element)}
       </div>
-      
-      {/* KPI 7-10: Advanced Analytics Metrics */}
+
+      {/* Advanced Analytics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         {filterCards(getKpiCards())
           .filter(card => card.category === 'analytics')
           .map(card => card.element)}
+      </div>
+      
+      {/* KPI 4-6: Additional Financial Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="p-4 bg-white border rounded-lg shadow-sm">
+          <h3 className="text-sm font-medium text-gray-600">Profit Margin</h3>
+          <p className="text-2xl font-bold text-purple-600">{formatNumber(financialSummary.profit_margin)}%</p>
+          <div className="mt-2">
+            <span className="text-xs text-gray-500">Overall performance</span>
+          </div>
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <p className="text-xs text-gray-600">Calculated as (Net Profit / Total Sales) × 100. Indicates what percentage of sales is converted to actual profit after all expenses.</p>
+          </div>
+        </div>
+        
+        <div className="p-4 bg-white border rounded-lg shadow-sm">
+          <h3 className="text-sm font-medium text-gray-600">Accounts Receivable</h3>
+          <p className={`text-2xl font-bold ${getValueColor(financialSummary.accounts_receivable)}`}>
+            ${formatNumber(financialSummary.accounts_receivable)} {getTrend(financialSummary.accounts_receivable)}
+          </p>
+          <div className="mt-2">
+            <span className="text-xs text-gray-500">Outstanding payments</span>
+          </div>
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <p className="text-xs text-gray-600">Money owed to your company by customers for goods or services delivered but not yet paid for. Negative values indicate prepayments or credits.</p>
+          </div>
+        </div>
+        
+        <div className="p-4 bg-white border rounded-lg shadow-sm">
+          <h3 className="text-sm font-medium text-gray-600">Accounts Payable</h3>
+          <p className={`text-2xl font-bold ${getValueColor(financialSummary.accounts_payable)}`}>
+            ${formatNumber(financialSummary.accounts_payable)} {getTrend(financialSummary.accounts_payable)}
+          </p>
+          <div className="mt-2">
+            <span className="text-xs text-gray-500">Pending payments</span>
+          </div>
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <p className="text-xs text-gray-600">Money your company owes to suppliers or vendors for goods or services received but not yet paid for. Affects cash flow and liquidity.</p>
+          </div>
+        </div>
+      </div>
+      
+      {/* KPI 7-10: Advanced Analytics Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="p-4 bg-white border rounded-lg shadow-sm">
+          <h3 className="text-sm font-medium text-gray-600">ROI</h3>
+          <p className="text-2xl font-bold text-indigo-600">{formatNumber(additionalKPIs.roi)}%</p>
+          <div className="mt-2">
+            <span className="text-xs text-gray-500">Return on Investment</span>
+          </div>
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <p className="text-xs text-gray-600">Calculated as (Net Profit / Total Expenses) × 100. Measures how efficiently investments generate profit relative to their cost.</p>
+          </div>
+        </div>
+        
+        <div className="p-4 bg-white border rounded-lg shadow-sm">
+          <h3 className="text-sm font-medium text-gray-600">Current Ratio</h3>
+          <p className="text-2xl font-bold text-teal-600">{formatNumber(additionalKPIs.currentRatio)}</p>
+          <div className="mt-2">
+            <span className="text-xs text-gray-500">Liquidity measure</span>
+          </div>
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <p className="text-xs text-gray-600">Calculated as Accounts Receivable / Accounts Payable. Indicates ability to pay short-term obligations. Ratio greater than 1 is generally favorable.</p>
+          </div>
+        </div>
+        
+        <div className="p-4 bg-white border rounded-lg shadow-sm">
+          <h3 className="text-sm font-medium text-gray-600">Operational Efficiency</h3>
+          <p className="text-2xl font-bold text-amber-600">{formatNumber(additionalKPIs.operationalEfficiency)}%</p>
+          <div className="mt-2">
+            <span className="text-xs text-gray-500">Cost effectiveness</span>
+          </div>
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <p className="text-xs text-gray-600">Calculated as (Total Sales / Total Expenses) × 100. Measures how efficiently the company converts expenses into revenue.</p>
+          </div>
+        </div>
+        
+        <div className="p-4 bg-white border rounded-lg shadow-sm">
+          <h3 className="text-sm font-medium text-gray-600">Growth Rate</h3>
+          <p className="text-2xl font-bold text-emerald-600">{formatNumber(additionalKPIs.growthRate)}%</p>
+          <div className="mt-2">
+            <span className="text-xs text-gray-500">Year-over-year</span>
+          </div>
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <p className="text-xs text-gray-600">Annual percentage increase in revenue. Indicates business expansion rate and market performance compared to previous periods.</p>
+          </div>
+        </div>
       </div>
       
       {/* Cash Flow Charts */}
