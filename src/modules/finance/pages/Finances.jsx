@@ -310,6 +310,9 @@ function Finances() {
       const pdf = new jsPDF("p", "mm", "a4");
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
+      
+      // Declarar la variable yPos que se usará para posicionar elementos en el PDF
+      let yPos = 0;
 
       // Añadir título y fecha con estilo mejorado
       pdf.setFillColor(248, 250, 252); // bg-gray-50
@@ -520,50 +523,7 @@ function Finances() {
 
       // ===== SECOND PAGE: GRAPHICAL ANALYSIS (2 charts) =====
       pdf.addPage();
-      yPos = 20;
-      // Añadir tabla de composición del flujo de caja al PDF
-      pdf.setFontSize(12);
-      pdf.setTextColor(44, 62, 80);
-      pdf.text("Composición del Flujo de Caja", 14, yPos);
-      yPos += 10;
-
-      // Crear encabezados de tabla
-      pdf.setFillColor(240, 240, 240);
-      pdf.setDrawColor(200, 200, 200);
-      pdf.setTextColor(0, 0, 0);
-      pdf.setFontSize(10);
-
-      const { cash_flow_summary } = financialSummary;
-
-      // Dibujar encabezados de tabla
-      pdf.rect(14, yPos, 90, 8, "FD");
-      pdf.rect(104, yPos, 90, 8, "FD");
-      pdf.text("Tipo de Flujo", 16, yPos + 5);
-      pdf.text("Valor", 106, yPos + 5);
-      yPos += 8;
-
-      // Añadir filas de tabla
-      const cashFlowTypes = [
-        { name: "Operating", value: cash_flow_summary.operating },
-        { name: "Investment", value: cash_flow_summary.investment },
-        { name: "Financing", value: cash_flow_summary.financing },
-        {
-          name: "Total",
-          value:
-            cash_flow_summary.operating +
-            cash_flow_summary.investment +
-            cash_flow_summary.financing,
-        },
-      ];
-
-      cashFlowTypes.forEach((type, index) => {
-        const rowY = yPos + index * 8;
-        pdf.setFillColor(255, 255, 255);
-        pdf.rect(14, rowY, 90, 8, "FD");
-        pdf.rect(104, rowY, 90, 8, "FD");
-        pdf.text(type.name, 16, rowY + 5);
-        pdf.text("$" + formatNumber(type.value), 106, rowY + 5);
-      });
+      yPos = 20; // Asignar valor a la variable yPos
 
       // Second page header
       pdf.setFillColor(248, 250, 252); // bg-gray-50
@@ -610,7 +570,7 @@ function Finances() {
       };
 
       // Capturar y añadir las primeras 2 gráficas en la segunda página
-      let yPos = 40;
+      yPos = 40;
 
       // Gráfica 1: Análisis de Flujo de Caja
       if (cashFlowChartRef.current) {
@@ -700,39 +660,195 @@ function Finances() {
       pdf.setDrawColor(229, 231, 235); // border-gray-200
       pdf.line(14, 30, pageWidth - 14, 30);
 
-      // Capturar y añadir las 2 gráficas restantes en la tercera página
+      // Añadir una tercera página para Cash Flow Composition y Volatility
+      pdf.addPage();
       yPos = 40;
 
-      // Gráfica 3: Composición del Flujo de Caja
-      if (cashFlowCompositionRef.current) {
-        try {
-          const canvas = await html2canvas(
-            cashFlowCompositionRef.current,
-            captureOptions
-          );
-          const imgData = canvas.toDataURL("image/png");
-          const imgWidth = pageWidth - pageMargin * 2; // Ancho de la imagen con márgenes iguales
-          const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      // Tercera página header
+      pdf.setFillColor(248, 250, 252); // bg-gray-50
+      pdf.rect(0, 0, pageWidth, 30, "F");
 
-          // Align title to the left
-          pdf.setFontSize(14);
+      pdf.setFontSize(18);
+      pdf.setTextColor(31, 41, 55); // text-gray-800
+      pdf.setFont(undefined, "bold");
+      pdf.text("Cash Flow Details", pageWidth / 2, 15, { align: "center" });
+
+      pdf.setFontSize(10);
+      pdf.setTextColor(107, 114, 128); // text-gray-500
+      pdf.setFont(undefined, "normal");
+      pdf.text(`Generated on: ${today}`, pageWidth / 2, 22, {
+        align: "center",
+      });
+
+      // Añadir línea separadora
+      pdf.setDrawColor(229, 231, 235); // border-gray-200
+      pdf.line(14, 30, pageWidth - 14, 30);
+
+      // Sección 1: Cash Flow Composition
+      pdf.setFontSize(14);
+      pdf.setTextColor(31, 41, 55); // text-gray-800
+      pdf.setFont(undefined, "bold");
+      pdf.text("Cash Flow Composition", pageMargin, yPos);
+      yPos += 10;
+
+      // Crear tabla de composición del flujo de caja
+      if (financialSummary && financialSummary.cash_flow_summary) {
+        // Definir ancho de columnas y posiciones
+        const colWidth1 = 50; // Tipo
+        const colWidth2 = 50; // Monto
+        const colWidth3 = 80; // Descripción
+        const tableWidth = colWidth1 + colWidth2 + colWidth3;
+        const tableX = pageMargin;
+        const rowHeight = 10;
+
+        // Dibujar encabezados de tabla
+        pdf.setFillColor(240, 240, 240);
+        pdf.setDrawColor(200, 200, 200);
+        pdf.setTextColor(75, 85, 99); // text-gray-600
+        pdf.setFontSize(10);
+        pdf.setFont(undefined, "bold");
+
+        // Encabezados
+        pdf.rect(tableX, yPos, colWidth1, rowHeight, "FD");
+        pdf.rect(tableX + colWidth1, yPos, colWidth2, rowHeight, "FD");
+        pdf.rect(tableX + colWidth1 + colWidth2, yPos, colWidth3, rowHeight, "FD");
+        
+        pdf.text("Type", tableX + 3, yPos + 7);
+        pdf.text("Amount", tableX + colWidth1 + 3, yPos + 7);
+        pdf.text("Description", tableX + colWidth1 + colWidth2 + 3, yPos + 7);
+        
+        yPos += rowHeight;
+
+        // Preparar datos de la tabla
+        const cashFlowData = [
+          {
+            type: "Operating",
+            amount: financialSummary.cash_flow_summary.operating,
+            description: "Cash generated or used in day-to-day business operations"
+          },
+          {
+            type: "Investment",
+            amount: financialSummary.cash_flow_summary.investment,
+            description: "Cash from purchase or sale of long-term assets"
+          },
+          {
+            type: "Financing",
+            amount: financialSummary.cash_flow_summary.financing,
+            description: "Cash from debt, equity, and dividend activities"
+          },
+          {
+            type: "Total",
+            amount: financialSummary.cash_flow_summary.operating + 
+                    financialSummary.cash_flow_summary.investment + 
+                    financialSummary.cash_flow_summary.financing,
+            description: "Net change in cash position for the period"
+          }
+        ];
+
+        // Dibujar filas de datos
+        pdf.setFont(undefined, "normal");
+
+        cashFlowData.forEach((row, index) => {
+          // Determinar color del texto para los montos
+          const textColor = row.amount > 0 ? [22, 163, 74] : [220, 38, 38]; // verde o rojo
+          
+          // Establecer color de fondo para la fila (blanco para filas normales, gris claro para el total)
+          if (row.type === "Total") {
+            pdf.setFillColor(240, 240, 240); // Gris claro para el total
+          } else {
+            pdf.setFillColor(255, 255, 255); // Blanco para las filas normales
+          }
+          
+          // Dibujar celdas
+          pdf.rect(tableX, yPos, colWidth1, rowHeight, "FD");
+          pdf.rect(tableX + colWidth1, yPos, colWidth2, rowHeight, "FD");
+          pdf.rect(tableX + colWidth1 + colWidth2, yPos, colWidth3, rowHeight, "FD");
+          
+          // Tipo (negrita para el total)
           pdf.setTextColor(31, 41, 55); // text-gray-800
-          pdf.setFont(undefined, "bold");
-          pdf.text("Cash Flow Composition", pageMargin, yPos);
+          if (row.type === "Total") {
+            pdf.setFont(undefined, "bold");
+          } else {
+            pdf.setFont(undefined, "normal");
+          }
+          pdf.text(row.type, tableX + 3, yPos + 7);
+          
+          // Monto (con color según valor)
+          pdf.setTextColor(...textColor);
+          pdf.text(`$${formatNumber(row.amount)}`, tableX + colWidth1 + 3, yPos + 7);
+          
+          // Descripción
+          pdf.setTextColor(107, 114, 128); // text-gray-500
+          pdf.setFont(undefined, "normal"); // Volver a normal para la descripción
+          
+          // Dividir descripción en múltiples líneas si es necesario
+          const splitDesc = pdf.splitTextToSize(row.description, colWidth3 - 6);
+          pdf.text(splitDesc, tableX + colWidth1 + colWidth2 + 3, yPos + 5);
+          
+          // Ajustar altura de fila si la descripción ocupa más de una línea
+          const actualRowHeight = Math.max(rowHeight, splitDesc.length * 5);
+          yPos += actualRowHeight;
+        });
+        
+        yPos += 15; // Espacio después de la tabla
+      }
 
-          // Centrar la imagen en la página
-          pdf.addImage(
-            imgData,
-            "PNG",
-            pageMargin,
-            yPos + 5,
-            imgWidth,
-            imgHeight
-          );
-          yPos += imgHeight + 25; // Aumentar el espacio entre gráficas
-        } catch (err) {
-          console.error("Error capturing Cash Flow Composition Chart:", err);
+      // Sección 2: Cash Flow Volatility
+      if (additionalKPIs) {
+        pdf.setFontSize(14);
+        pdf.setTextColor(31, 41, 55); // text-gray-800
+        pdf.setFont(undefined, "bold");
+        pdf.text("Cash Flow Volatility", pageMargin, yPos);
+        yPos += 10;
+
+        // Dibujar barra de progreso
+        const barWidth = 150;
+        const barHeight = 8;
+        const barX = pageMargin;
+        const barY = yPos;
+        
+        // Fondo de la barra
+        pdf.setFillColor(229, 231, 235); // bg-gray-200
+        pdf.rect(barX, barY, barWidth, barHeight, "F");
+        
+        // Determinar color según el nivel de volatilidad
+        let fillColor;
+        if (additionalKPIs.cashFlowVolatility > 50) {
+          fillColor = [220, 38, 38]; // bg-red-600
+        } else if (additionalKPIs.cashFlowVolatility > 25) {
+          fillColor = [251, 191, 36]; // bg-yellow-400
+        } else {
+          fillColor = [22, 163, 74]; // bg-green-600
         }
+        
+        // Barra de progreso
+        const progressWidth = Math.min(100, additionalKPIs.cashFlowVolatility) / 100 * barWidth;
+        pdf.setFillColor(...fillColor);
+        pdf.rect(barX, barY, progressWidth, barHeight, "F");
+        
+        // Valor numérico
+        pdf.setTextColor(31, 41, 55); // text-gray-800
+        pdf.setFontSize(10);
+        pdf.setFont(undefined, "bold");
+        pdf.text(`${formatNumber(additionalKPIs.cashFlowVolatility)}%`, barX + barWidth + 5, barY + 6);
+        
+        // Descripción
+        yPos += barHeight + 8;
+        pdf.setTextColor(107, 114, 128); // text-gray-600
+        pdf.setFontSize(10);
+        pdf.setFont(undefined, "normal");
+        
+        let volatilityDescription;
+        if (additionalKPIs.cashFlowVolatility > 50) {
+          volatilityDescription = "High volatility - cash flow is unstable and requires attention";
+        } else if (additionalKPIs.cashFlowVolatility > 25) {
+          volatilityDescription = "Moderate volatility - monitor cash flow trends";
+        } else {
+          volatilityDescription = "Low volatility - stable cash flow";
+        }
+        
+        pdf.text(volatilityDescription, pageMargin, yPos);
+        yPos += 15;
       }
 
       // Gráfica 4: Análisis de Rentabilidad
